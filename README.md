@@ -183,6 +183,6 @@ Distributed under the **MIT License**. See [LICENSE](LICENSE) for full terms.
 
 <div align="center">
 
-**Build by Abdurrahman**
+***Build by Abdurrahman***
 
 </div>
