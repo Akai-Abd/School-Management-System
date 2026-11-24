@@ -9,6 +9,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "db:generate": "pnpm --filter @school-erp/api db:generate",
+    "db:push": "pnpm --filter @school-erp/api db:push",
     "db:migrate": "pnpm --filter @school-erp/api db:migrate",
     "db:bootstrap": "pnpm --filter @school-erp/api db:bootstrap"
   }

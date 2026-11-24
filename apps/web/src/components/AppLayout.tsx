@@ -6,23 +6,41 @@ interface NavItem {
   to: string;
   icon: string;
   permission?: string;
+  moduleKey?: string;
 }
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', to: '/', icon: 'bi-speedometer2' },
-  { label: 'Students', to: '/students', icon: 'bi-people', permission: 'students.view' },
-  { label: 'Staff', to: '/staff', icon: 'bi-person-badge', permission: 'staff.view' },
-  { label: 'Attendance', to: '/attendance', icon: 'bi-calendar-check', permission: 'attendance.view' },
-  { label: 'Examinations', to: '/exams', icon: 'bi-journal-check', permission: 'exams.view' },
-  { label: 'Fees & Billing', to: '/fees', icon: 'bi-receipt', permission: 'fees.view' },
+  { label: 'Academic', to: '/academic', icon: 'bi-diagram-3', permission: 'academic.view', moduleKey: 'academic' },
+  { label: 'Students', to: '/students', icon: 'bi-people', permission: 'students.view', moduleKey: 'students' },
+  { label: 'Staff', to: '/staff', icon: 'bi-person-badge', permission: 'staff.view', moduleKey: 'staff' },
+  { label: 'Attendance', to: '/attendance', icon: 'bi-calendar-check', permission: 'attendance.view', moduleKey: 'attendance' },
+  { label: 'Timetable', to: '/timetable', icon: 'bi-table', permission: 'timetable.view', moduleKey: 'timetable' },
+  { label: 'Examinations', to: '/exams', icon: 'bi-journal-check', permission: 'exams.view', moduleKey: 'exams' },
+  { label: 'Online Exams', to: '/online-exams', icon: 'bi-laptop', permission: 'exams.view', moduleKey: 'online_exams' },
+  { label: 'Homework', to: '/homework', icon: 'bi-book', permission: 'homework.view', moduleKey: 'homework' },
+  { label: 'Fees & Billing', to: '/fees', icon: 'bi-receipt', permission: 'fees.view', moduleKey: 'fees' },
+  { label: 'Accounting', to: '/accounting', icon: 'bi-journal-richtext', permission: 'accounting.view', moduleKey: 'accounting' },
+  { label: 'Library', to: '/library', icon: 'bi-bookshelf', permission: 'library.view', moduleKey: 'library' },
+  { label: 'Transport', to: '/transport', icon: 'bi-bus-front', permission: 'transport.view', moduleKey: 'transport' },
+  { label: 'Hostel', to: '/hostel', icon: 'bi-building', permission: 'hostel.view', moduleKey: 'hostel' },
+  { label: 'Website', to: '/website', icon: 'bi-globe', permission: 'website.view', moduleKey: 'website' },
+  { label: 'Notifications', to: '/notifications', icon: 'bi-bell', moduleKey: 'communications' },
   { label: 'Settings', to: '/settings', icon: 'bi-gear', permission: 'schools.view' },
 ];
 
 export function AppLayout() {
-  const { session, activeMembership, logout, switchSchool, hasPermission } = useAuth();
+  const { session, activeMembership, logout, switchSchool, hasPermission, isModuleEnabled } = useAuth();
   const location = useLocation();
 
-  const visibleNav = NAV_ITEMS.filter((item) => !item.permission || hasPermission(item.permission));
+  const visibleNav = NAV_ITEMS.filter(
+    (item) =>
+      (!item.permission || hasPermission(item.permission)) &&
+      (!item.moduleKey || isModuleEnabled(item.moduleKey)),
+  );
+  if (session?.appMode === 'saas' && session.user.isPlatformAdmin) {
+    visibleNav.push({ label: 'Platform', to: '/platform', icon: 'bi-buildings' });
+  }
 
   const sidebarContent = (
     <nav className="nav flex-column gap-1 p-3" aria-label="Primary navigation">

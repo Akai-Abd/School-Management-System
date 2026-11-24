@@ -43,5 +43,27 @@ export const SYSTEM_ROLE_KEYS = [
   'accountant',
   'librarian',
   'driver',
+  'hostel_warden',
 ] as const;
 export type SystemRoleKey = (typeof SYSTEM_ROLE_KEYS)[number];
+
+export const CONFIGURABLE_MODULE_KEYS = [
+  'students',
+  'staff',
+  'academic',
+  'attendance',
+  'timetable',
+  'exams',
+  'online_exams',
+  'homework',
+  'fees',
+  'accounting',
+  'library',
+  'transport',
+  'hostel',
+  'communications',
+  'reports',
+  'website',
+  'imports',
+] as const;
+export type ConfigurableModuleKey = (typeof CONFIGURABLE_MODULE_KEYS)[number];

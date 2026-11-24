@@ -11,6 +11,7 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   switchSchool: (schoolId: string | null) => Promise<void>;
   hasPermission: (code: string) => boolean;
+  isModuleEnabled: (moduleKey: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -69,9 +70,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return activeMembership.roles.includes('school_admin') || activeMembership.permissions.includes(code);
   }
 
+  function isModuleEnabled(moduleKey: string) {
+    if (!activeMembership) return false;
+    return activeMembership.enabledModules.includes(moduleKey);
+  }
+
   return (
     <AuthContext.Provider
-      value={{ session, activeMembership, isLoading, login, logout, switchSchool, hasPermission }}
+      value={{ session, activeMembership, isLoading, login, logout, switchSchool, hasPermission, isModuleEnabled }}
     >
       {children}
     </AuthContext.Provider>

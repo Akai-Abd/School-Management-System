@@ -10,6 +10,7 @@ export interface AuthContext {
   csrfToken: string;
   permissions: Set<string>;
   roles: string[];
+  enabledModules: Set<string>;
 }
 
 declare global {

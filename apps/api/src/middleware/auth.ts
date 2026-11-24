@@ -1,8 +1,14 @@
 import crypto from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
+import { CONFIGURABLE_MODULE_KEYS, type ConfigurableModuleKey } from '@school-erp/contracts';
 import { env } from '../config/env.js';
 import { Errors } from '../lib/errors.js';
 import { forTenant, prisma } from '../lib/prisma.js';
+
+export function resolveEnabledModules(rows: Array<{ moduleKey: string; isEnabled: boolean }>): string[] {
+  if (rows.length === 0) return [...CONFIGURABLE_MODULE_KEYS];
+  return rows.filter((r) => r.isEnabled).map((r) => r.moduleKey);
+}
 
 export const SESSION_COOKIE_NAME = 'school_erp_sid';
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -47,6 +53,7 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
 
   const permissions = new Set<string>();
   const roles: string[] = [];
+  const enabledModules = new Set<string>();
 
   if (session.activeSchoolId) {
     const membership = await prisma.schoolMembership.findUnique({
@@ -57,7 +64,11 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
         },
       },
       include: {
-        school: true,
+        school: {
+          include: {
+            modules: true,
+          },
+        },
         userRoles: {
           include: {
             role: {
@@ -81,6 +92,10 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
       return next(Errors.forbidden('No active membership for selected school'));
     }
 
+    for (const modKey of resolveEnabledModules(membership.school.modules)) {
+      enabledModules.add(modKey);
+    }
+
     for (const ur of membership.userRoles) {
       if (ur.role.deletedAt !== null) continue;
       roles.push(ur.role.key);
@@ -100,6 +115,7 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
     csrfToken: session.csrfToken,
     permissions,
     roles,
+    enabledModules,
   };
 
   next();
@@ -143,6 +159,18 @@ export function requirePermission(permissionCode: string) {
       return next();
     }
     return next(Errors.forbidden(`Missing permission: ${permissionCode}`));
+  };
+}
+
+/** Rejects requests to a school module that has been disabled in school_modules (M01-AC5). */
+export function requireModule(moduleKey: ConfigurableModuleKey) {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    if (!req.auth) return next(Errors.unauthorized());
+    if (!req.auth.activeSchoolId) return next(Errors.forbidden('School context required'));
+    if (!req.auth.enabledModules.has(moduleKey)) {
+      return next(Errors.forbidden(`Module '${moduleKey}' is disabled for this school`));
+    }
+    return next();
   };
 }
 

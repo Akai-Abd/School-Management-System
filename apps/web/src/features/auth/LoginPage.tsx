@@ -10,6 +10,7 @@ export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [mfaRequired, setMfaRequired] = useState(false);
 
   const {
     register,
@@ -25,7 +26,12 @@ export function LoginPage() {
       await login(values);
       navigate('/', { replace: true });
     } catch (err) {
-      setServerError(err instanceof ApiClientError ? err.message : 'Unable to sign in');
+      if (err instanceof ApiClientError && err.code === 'MFA_REQUIRED') {
+        setMfaRequired(true);
+        setServerError('Enter your 6-digit authenticator code.');
+      } else {
+        setServerError(err instanceof ApiClientError ? err.message : 'Unable to sign in');
+      }
     }
   }
 
@@ -56,7 +62,7 @@ export function LoginPage() {
               {errors.email && <div className="invalid-feedback">{errors.email.message}</div>}
             </div>
 
-            <div className="mb-4">
+            <div className="mb-3">
               <label htmlFor="password" className="form-label">
                 Password
               </label>
@@ -69,7 +75,23 @@ export function LoginPage() {
               {errors.password && <div className="invalid-feedback">{errors.password.message}</div>}
             </div>
 
-            <button type="submit" className="btn btn-primary w-100" disabled={isSubmitting}>
+            {mfaRequired && (
+              <div className="mb-3">
+                <label htmlFor="totpCode" className="form-label">
+                  Authenticator Code (6 digits)
+                </label>
+                <input
+                  id="totpCode"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  className="form-control"
+                  {...register('totpCode')}
+                />
+              </div>
+            )}
+
+            <button type="submit" className="btn btn-primary w-100 mt-2" disabled={isSubmitting}>
               {isSubmitting ? 'Signing in...' : 'Sign in'}
             </button>
           </form>

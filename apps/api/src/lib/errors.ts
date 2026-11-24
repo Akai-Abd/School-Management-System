@@ -21,6 +21,8 @@ export const Errors = {
     new AppError(403, 'FORBIDDEN', message),
   notFound: (message = 'Resource not found') => new AppError(404, 'NOT_FOUND', message),
   conflict: (message: string) => new AppError(409, 'CONFLICT', message),
+  tooManyRequests: (message = 'Too many attempts. Please try again later.') =>
+    new AppError(429, 'TOO_MANY_REQUESTS', message),
 };
 
 export function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction) {

@@ -28,7 +28,7 @@
   <a href="#-tech-stack">Tech Stack</a> •
   <a href="#-quick-start">Quick Start</a> •
   <a href="#-roadmap">Roadmap</a> •
-  <a href="School%20Management%20System.md">PRD</a>
+  <a href="School_Management_System_PRD_v1.1.md">PRD v1.1</a>
 </p>
 
 </div>
@@ -36,8 +36,8 @@
 ---
 
 > [!NOTE]
-> **Project Status — Phase 0 Complete (Foundation & Security Core)**
-> Core monorepo, multi-tenant schema, Argon2id session + CSRF auth, Local/S3 storage adapters, OpenAPI 3.1 docs, CI pipeline, and Bootstrap 5 web shell are implemented and verified. Full product specification: [School Management System.md](School%20Management%20System.md).
+> **Project Status — Phases 0–7 Implemented & Verified**
+> Full modular-monolith ERP covering Core Admin, Academics, Attendance, Timetable, Exams/Online Exams, Homework, Fees (`pdfkit` + `exceljs`), Double-Entry Accounting, Library, Transport, Hostel, BullMQ Notifications, SSR School Website, SaaS Platform Onboarding, Offline Licensing, and PostgreSQL `FORCE ROW LEVEL SECURITY`. Full specification: [School_Management_System_PRD_v1.1.md](School_Management_System_PRD_v1.1.md).
 
 ---
 
@@ -167,11 +167,11 @@ pnpm dev
 | Phase | Scope | Status |
 |---|---|---|
 | **Phase 0** | Monorepo, Docker, Prisma core, Argon2id + CSRF, `forTenant`, Storage, OpenAPI 3.1, Web Shell, CI | ✅ Done |
-| **Phase 1** | Schools, RBAC UI, academic years, staff/teachers, students & guardians | 🔜 Next |
-| **Phase 2** | Daily/period attendance, leave, conflict-free timetable, exams, homework, promotions | 📋 Planned |
-| **Phase 3A & 5A (MVP)** | Fee structures, invoices, payments, `pdfkit` receipts, refunds, parent/student read-only portals | 📋 Planned |
-| **Phase 3B & 4** | Double-entry accounting, library, transport, hostel, async notifications | 📋 Planned |
-| **Phase 5B – 7** | Online exams, dynamic school website, SaaS billing, PostgreSQL RLS, QA & production release | 📋 Planned |
+| **Phase 1** | Schools, RBAC UI, academic years, staff/teachers, students & guardians, CSV dry-run import | ✅ Done |
+| **Phase 2** | Daily/period attendance, leave, conflict-free timetable, exams, homework, promotions/TCs | ✅ Done |
+| **Phase 3A & 5A (MVP)** | Fee structures, invoices, payments, `pdfkit` receipts/report cards, `exceljs` export, maker-checker refunds, portals | ✅ Done |
+| **Phase 3B & 4** | Double-entry accounting, library, transport, hostel, BullMQ async notifications | ✅ Done |
+| **Phase 5B – 7** | Online exams, SSR dynamic school website, SaaS onboarding, PostgreSQL RLS, offline licence, full export | ✅ Done |
 
 ---
 

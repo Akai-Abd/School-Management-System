@@ -1,7 +1,13 @@
-import 'dotenv/config';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import dotenv from 'dotenv';
 import argon2 from 'argon2';
 import { PrismaClient } from '@prisma/client';
-import { PERMISSION_ACTIONS, SYSTEM_ROLE_KEYS } from '@school-erp/contracts';
+import { CONFIGURABLE_MODULE_KEYS, PERMISSION_ACTIONS, SYSTEM_ROLE_KEYS } from '@school-erp/contracts';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+dotenv.config();
 
 const prisma = new PrismaClient();
 
@@ -26,6 +32,7 @@ const MODULES = [
   'files',
   'audit_logs',
   'website',
+  'imports',
 ] as const;
 
 export async function seedPermissions() {
@@ -64,6 +71,18 @@ export async function bootstrapStandalone() {
   await prisma.$transaction(async (tx) => {
     const school = await tx.school.create({
       data: { name: schoolName, slug: schoolSlug },
+    });
+
+    await tx.schoolSetting.create({
+      data: { schoolId: school.id },
+    });
+
+    await tx.schoolModule.createMany({
+      data: CONFIGURABLE_MODULE_KEYS.map((moduleKey) => ({
+        schoolId: school.id,
+        moduleKey,
+        isEnabled: true,
+      })),
     });
 
     const user = await tx.user.create({

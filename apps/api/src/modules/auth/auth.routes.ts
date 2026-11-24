@@ -1,21 +1,26 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import {
+  acceptInviteSchema,
   forgotPasswordSchema,
   loginSchema,
   resetPasswordSchema,
   switchSchoolSchema,
+  verifyMfaSchema,
 } from '@school-erp/contracts';
 import { env } from '../../config/env.js';
 import { requireAuth, requireCsrf, SESSION_COOKIE_NAME } from '../../middleware/auth.js';
 import { validateBody } from '../../middleware/validate.js';
 import {
+  acceptUserInvitation,
   buildAuthMe,
   createPasswordResetToken,
   loginWithPassword,
   resetPasswordWithToken,
   revokeSession,
+  setupUserMfa,
   switchActiveSchool,
+  verifyAndEnableMfa,
 } from './auth.service.js';
 
 export const authRouter = Router();
@@ -103,6 +108,33 @@ authRouter.post('/reset-password', authRateLimiter, validateBody(resetPasswordSc
   try {
     await resetPasswordWithToken(req.body);
     res.json({ message: 'Password updated successfully.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+authRouter.post('/accept-invite', authRateLimiter, validateBody(acceptInviteSchema), async (req, res, next) => {
+  try {
+    await acceptUserInvitation(req.body, req.requestId);
+    res.json({ message: 'Invitation accepted. You may now sign in.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+authRouter.post('/mfa/setup', requireAuth, requireCsrf, async (req, res, next) => {
+  try {
+    const setup = await setupUserMfa(req.auth!.userId, req.auth!.email);
+    res.json(setup);
+  } catch (err) {
+    next(err);
+  }
+});
+
+authRouter.post('/mfa/verify', requireAuth, requireCsrf, validateBody(verifyMfaSchema), async (req, res, next) => {
+  try {
+    await verifyAndEnableMfa(req.auth!.userId, req.body.code, req.auth!.activeSchoolId, req.requestId);
+    res.json({ mfaEnabled: true });
   } catch (err) {
     next(err);
   }

@@ -4,13 +4,96 @@ import { Errors } from './errors.js';
 export const prisma = new PrismaClient();
 
 const TENANT_SCOPED_MODELS = new Set([
+  'SchoolSetting',
+  'SchoolModule',
   'SchoolMembership',
   'Role',
   'RolePermission',
   'UserRole',
+  'UserInvitation',
   'DocumentSequence',
   'IdempotencyKey',
   'Attachment',
+  'AcademicYear',
+  'AcademicTerm',
+  'CalendarEvent',
+  'SchoolClass',
+  'Section',
+  'Subject',
+  'SubjectGroup',
+  'ClassSubject',
+  'Department',
+  'Designation',
+  'Staff',
+  'StaffEmploymentHistory',
+  'TeacherProfile',
+  'ClassTeacher',
+  'TeacherAssignment',
+  'Student',
+  'Guardian',
+  'StudentGuardian',
+  'StudentEnrollment',
+  'StudentSubject',
+  'StudentMedicalRecord',
+  'StudentEmergencyContact',
+  'ImportBatch',
+  'AttendanceSession',
+  'StudentAttendance',
+  'StaffAttendance',
+  'LeaveRequest',
+  'TimetablePeriod',
+  'Classroom',
+  'TimetableEntry',
+  'Exam',
+  'ExamSubject',
+  'Mark',
+  'MarkRevision',
+  'Homework',
+  'HomeworkSubmission',
+  'StudentPromotion',
+  'Notification',
+  'FeeType',
+  'FeeStructure',
+  'FeeStructureItem',
+  'Invoice',
+  'InvoiceItem',
+  'Payment',
+  'PaymentAllocation',
+  'StudentCredit',
+  'PaymentRefund',
+  'FinancialEvent',
+  'Account',
+  'FiscalYear',
+  'AccountingPeriod',
+  'PostingRule',
+  'JournalEntry',
+  'JournalEntryLine',
+  'BookCategory',
+  'Book',
+  'BookCopy',
+  'BookIssue',
+  'Vehicle',
+  'TransportRoute',
+  'RouteStop',
+  'TransportAssignment',
+  'TransportAttendance',
+  'Hostel',
+  'HostelRoom',
+  'HostelBed',
+  'HostelAllocation',
+  'NotificationDelivery',
+  'Message',
+  'QuestionBank',
+  'Question',
+  'QuestionOption',
+  'OnlineExam',
+  'OnlineExamQuestion',
+  'ExamAttempt',
+  'ExamAnswer',
+  'WebsiteSetting',
+  'WebsitePage',
+  'WebsiteAnnouncement',
+  'WebsiteEvent',
 ]);
 
 /**
@@ -93,4 +176,16 @@ export async function nextDocumentNumber(
     throw Errors.badRequest(`Missing document sequence for ${docType} (${scopeKey})`);
   }
   return `${row.prefix}${String(row.next_number).padStart(padWidth, '0')}`;
+}
+
+/** Runs a transaction with PostgreSQL RLS tenant context (`SET LOCAL app.current_school_id`). */
+export async function withTenantTx<T>(
+  schoolId: string,
+  fn: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  if (!schoolId) throw Errors.forbidden('Active school context is required');
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT set_config('app.current_school_id', ${schoolId}, true)`;
+    return fn(tx);
+  });
 }
