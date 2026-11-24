@@ -1,0 +1,267 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SchoolStatus {
+  active
+  inactive
+  suspended
+}
+
+enum MembershipStatus {
+  active
+  suspended
+}
+
+enum StorageProvider {
+  local
+  s3
+}
+
+enum FileVisibility {
+  private
+  public
+}
+
+model User {
+  id              String    @id @default(uuid()) @db.Uuid
+  email           String
+  passwordHash    String    @map("password_hash")
+  fullName        String    @map("full_name")
+  isPlatformAdmin Boolean   @default(false) @map("is_platform_admin")
+  isActive        Boolean   @default(true) @map("is_active")
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  memberships          SchoolMembership[]
+  sessions             Session[]             @relation("SessionUser")
+  impersonatedSessions Session[]             @relation("SessionImpersonator")
+  passwordResetTokens  PasswordResetToken[]
+  uploadedAttachments  Attachment[]
+  auditLogs            AuditLog[]
+
+  @@map("users")
+}
+
+model School {
+  id        String       @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String
+  status    SchoolStatus @default(active)
+  timezone  String       @default("Asia/Kolkata")
+  currency  String       @default("INR")
+  deletedAt DateTime?    @map("deleted_at") @db.Timestamptz
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+
+  memberships       SchoolMembership[]
+  roles             Role[]
+  sessions          Session[]
+  documentSequences DocumentSequence[]
+  idempotencyKeys   IdempotencyKey[]
+  attachments       Attachment[]
+  auditLogs         AuditLog[]
+
+  @@map("schools")
+}
+
+model SchoolMembership {
+  id        String           @id @default(uuid()) @db.Uuid
+  schoolId  String           @map("school_id") @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  status    MembershipStatus @default(active)
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+
+  school    School     @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Restrict)
+  userRoles UserRole[]
+
+  @@unique([schoolId, userId])
+  @@unique([id, schoolId])
+  @@index([userId])
+  @@map("school_memberships")
+}
+
+model Role {
+  id        String    @id @default(uuid()) @db.Uuid
+  schoolId  String    @map("school_id") @db.Uuid
+  key       String
+  name      String
+  isSystem  Boolean   @default(false) @map("is_system")
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  school          School           @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  rolePermissions RolePermission[]
+  userRoles       UserRole[]
+
+  @@unique([id, schoolId])
+  @@index([schoolId])
+  @@map("roles")
+}
+
+model Permission {
+  id          String @id @default(uuid()) @db.Uuid
+  module      String
+  action      String
+  code        String @unique
+  description String
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id") @db.Uuid
+  schoolId     String @map("school_id") @db.Uuid
+  permissionId String @map("permission_id") @db.Uuid
+
+  role       Role       @relation(fields: [roleId, schoolId], references: [id, schoolId], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([schoolId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  schoolMembershipId String @map("school_membership_id") @db.Uuid
+  schoolId           String @map("school_id") @db.Uuid
+  roleId             String @map("role_id") @db.Uuid
+
+  membership SchoolMembership @relation(fields: [schoolMembershipId, schoolId], references: [id, schoolId], onDelete: Cascade)
+  role       Role             @relation(fields: [roleId, schoolId], references: [id, schoolId], onDelete: Cascade)
+
+  @@id([schoolMembershipId, roleId])
+  @@index([schoolId])
+  @@map("user_roles")
+}
+
+model Session {
+  id                   String    @id @default(uuid()) @db.Uuid
+  tokenHash            String    @unique @map("token_hash")
+  csrfToken            String    @map("csrf_token")
+  userId               String    @map("user_id") @db.Uuid
+  activeSchoolId       String?   @map("active_school_id") @db.Uuid
+  impersonatedByUserId String?   @map("impersonated_by_user_id") @db.Uuid
+  ipAddress            String?   @map("ip_address")
+  userAgent            String?   @map("user_agent")
+  expiresAt            DateTime  @map("expires_at") @db.Timestamptz
+  revokedAt            DateTime? @map("revoked_at") @db.Timestamptz
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  lastSeenAt           DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz
+
+  user           User    @relation("SessionUser", fields: [userId], references: [id], onDelete: Cascade)
+  impersonatedBy User?   @relation("SessionImpersonator", fields: [impersonatedByUserId], references: [id], onDelete: SetNull)
+  activeSchool   School? @relation(fields: [activeSchoolId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz
+  usedAt    DateTime? @map("used_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model DocumentSequence {
+  id         String @id @default(uuid()) @db.Uuid
+  schoolId   String @map("school_id") @db.Uuid
+  docType    String @map("doc_type")
+  scopeKey   String @default("default") @map("scope_key")
+  prefix     String @default("")
+  nextNumber Int    @default(1) @map("next_number")
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, docType, scopeKey])
+  @@map("document_sequences")
+}
+
+model IdempotencyKey {
+  id           String   @id @default(uuid()) @db.Uuid
+  schoolId     String   @map("school_id") @db.Uuid
+  key          String
+  route        String
+  requestHash  String   @map("request_hash")
+  statusCode   Int      @map("status_code")
+  responseJson Json     @map("response_json")
+  expiresAt    DateTime @map("expires_at") @db.Timestamptz
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, key, route])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}
+
+model Attachment {
+  id               String          @id @default(uuid()) @db.Uuid
+  schoolId         String          @map("school_id") @db.Uuid
+  uploadedByUserId String          @map("uploaded_by_user_id") @db.Uuid
+  originalName     String          @map("original_name")
+  storageKey       String          @unique @map("storage_key")
+  storageProvider  StorageProvider @map("storage_provider")
+  visibility       FileVisibility  @default(private)
+  mimeType         String          @map("mime_type")
+  sizeBytes        Int             @map("size_bytes")
+  entityType       String?         @map("entity_type")
+  entityId         String?         @map("entity_id") @db.Uuid
+  deletedAt        DateTime?       @map("deleted_at") @db.Timestamptz
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz
+
+  school     School @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  uploadedBy User   @relation(fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([id, schoolId])
+  @@index([schoolId, entityType, entityId])
+  @@map("attachments")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  schoolId    String?  @map("school_id") @db.Uuid
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  action      String
+  entityType  String   @map("entity_type")
+  entityId    String?  @map("entity_id")
+  metadata    Json?
+  ipAddress   String?  @map("ip_address")
+  requestId   String?  @map("request_id")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  school School? @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  actor  User?   @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+model SystemSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("system_settings")
+}
