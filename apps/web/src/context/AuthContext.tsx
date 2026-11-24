@@ -1,6 +1,6 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AuthMeResponse, LoginInput, SchoolMembershipSummary } from '@school-erp/contracts';
+import type { AuthMeResponse, DemoQuickSigninRole, LoginInput, SchoolMembershipSummary } from '@school-erp/contracts';
 import { apiFetch, setCsrfToken } from '../api/client';
 
 interface AuthContextValue {
@@ -8,6 +8,7 @@ interface AuthContextValue {
   activeMembership: SchoolMembershipSummary | null;
   isLoading: boolean;
   login: (input: LoginInput) => Promise<AuthMeResponse>;
+  quickSignin: (role: DemoQuickSigninRole) => Promise<AuthMeResponse>;
   logout: () => Promise<void>;
   switchSchool: (schoolId: string | null) => Promise<void>;
   hasPermission: (code: string) => boolean;
@@ -38,14 +39,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const activeMembership =
     session?.memberships.find((m) => m.schoolId === session.activeSchoolId) ?? null;
 
+  function acceptSession(me: AuthMeResponse): AuthMeResponse {
+    setCsrfToken(me.csrfToken);
+    queryClient.setQueryData(['auth', 'me'], me);
+    return me;
+  }
+
   async function login(input: LoginInput) {
     const me = await apiFetch<AuthMeResponse>('/api/v1/auth/login', {
       method: 'POST',
       body: JSON.stringify(input),
     });
-    setCsrfToken(me.csrfToken);
-    queryClient.setQueryData(['auth', 'me'], me);
-    return me;
+    return acceptSession(me);
+  }
+
+  async function quickSignin(role: DemoQuickSigninRole) {
+    const me = await apiFetch<AuthMeResponse>('/api/v1/auth/quick-signin', {
+      method: 'POST',
+      body: JSON.stringify({ role }),
+    });
+    return acceptSession(me);
   }
 
   async function logout() {
@@ -77,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, activeMembership, isLoading, login, logout, switchSchool, hasPermission, isModuleEnabled }}
+      value={{ session, activeMembership, isLoading, login, quickSignin, logout, switchSchool, hasPermission, isModuleEnabled }}
     >
       {children}
     </AuthContext.Provider>

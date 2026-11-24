@@ -128,4 +128,29 @@ describe('Phase 0 foundation security & configuration', () => {
     const unauthFiles = await request(app).get('/api/v1/files/00000000-0000-0000-0000-000000000000/download');
     expect(unauthFiles.status).toBe(401);
   });
+
+  it('should reject ENABLE_DEMO_QUICK_SIGNIN in production and return 404 when disabled', async () => {
+    expect(() =>
+      loadEnv({
+        NODE_ENV: 'production',
+        SESSION_SECRET: 'non-default-prod-secret-value-1234',
+        ENABLE_DEMO_QUICK_SIGNIN: 'true',
+      }),
+    ).toThrow();
+
+    const { env } = await import('../src/config/env.js');
+    const prev = env.ENABLE_DEMO_QUICK_SIGNIN;
+    env.ENABLE_DEMO_QUICK_SIGNIN = false;
+    try {
+      const app = createApp();
+      const cfg = await request(app).get('/api/v1/auth/demo-config');
+      expect(cfg.status).toBe(200);
+      expect(cfg.body.quickSigninEnabled).toBe(false);
+
+      const quick = await request(app).post('/api/v1/auth/quick-signin').send({ role: 'teacher' });
+      expect(quick.status).toBe(404);
+    } finally {
+      env.ENABLE_DEMO_QUICK_SIGNIN = prev;
+    }
+  });
 });

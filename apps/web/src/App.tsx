@@ -5,7 +5,9 @@ import { useAuth } from './context/AuthContext';
 import { AcademicPage } from './features/academic/AcademicPage';
 import { AccountingPage } from './features/accounting/AccountingPage';
 import { AttendancePage } from './features/attendance/AttendancePage';
+import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
 import { LoginPage } from './features/auth/LoginPage';
+import { ResetPasswordPage } from './features/auth/ResetPasswordPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { ExamsPage } from './features/exams/ExamsPage';
 import { FeesPage } from './features/fees/FeesPage';
@@ -33,6 +35,8 @@ export function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route element={<ProtectedShell />}>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/academic" element={<AcademicPage />} />

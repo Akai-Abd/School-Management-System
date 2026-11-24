@@ -28,6 +28,10 @@ const envSchema = z
       .enum(['true', 'false'])
       .default('false')
       .transform((v) => v === 'true'),
+    ENABLE_DEMO_QUICK_SIGNIN: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
     STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
     LOCAL_STORAGE_DIR: z.string().min(1).default('./storage'),
     MAX_UPLOAD_MB: z.coerce.number().int().min(1).max(100).default(10),
@@ -43,6 +47,13 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ['SESSION_SECRET'],
         message: 'Production requires a non-default SESSION_SECRET',
+      });
+    }
+    if (data.NODE_ENV === 'production' && data.ENABLE_DEMO_QUICK_SIGNIN) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['ENABLE_DEMO_QUICK_SIGNIN'],
+        message: 'ENABLE_DEMO_QUICK_SIGNIN cannot be enabled in production',
       });
     }
     if (data.STORAGE_DRIVER === 's3') {

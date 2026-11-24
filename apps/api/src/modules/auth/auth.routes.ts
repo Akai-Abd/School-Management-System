@@ -1,14 +1,16 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import {
   acceptInviteSchema,
   forgotPasswordSchema,
   loginSchema,
+  quickSigninSchema,
   resetPasswordSchema,
   switchSchoolSchema,
   verifyMfaSchema,
 } from '@school-erp/contracts';
 import { env } from '../../config/env.js';
+import { Errors } from '../../lib/errors.js';
 import { requireAuth, requireCsrf, SESSION_COOKIE_NAME } from '../../middleware/auth.js';
 import { validateBody } from '../../middleware/validate.js';
 import {
@@ -16,6 +18,7 @@ import {
   buildAuthMe,
   createPasswordResetToken,
   loginWithPassword,
+  quickSigninAsDemoRole,
   resetPasswordWithToken,
   revokeSession,
   setupUserMfa,
@@ -32,6 +35,41 @@ const authRateLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+function setSessionCookie(res: Response, rawSessionToken: string, expiresAt: Date) {
+  res.cookie(SESSION_COOKIE_NAME, rawSessionToken, {
+    httpOnly: true,
+    secure: env.COOKIE_SECURE,
+    sameSite: 'lax',
+    expires: expiresAt,
+    path: '/',
+  });
+}
+
+function isQuickSigninEnabled(): boolean {
+  return env.NODE_ENV !== 'production' && env.ENABLE_DEMO_QUICK_SIGNIN;
+}
+
+authRouter.get('/demo-config', (_req, res) => {
+  res.json({ quickSigninEnabled: isQuickSigninEnabled() });
+});
+
+authRouter.post('/quick-signin', authRateLimiter, validateBody(quickSigninSchema), async (req, res, next) => {
+  try {
+    if (!isQuickSigninEnabled()) {
+      throw Errors.notFound('Quick sign-in is disabled');
+    }
+    const result = await quickSigninAsDemoRole(req.body.role, {
+      ipAddress: req.ip,
+      userAgent: req.header('user-agent'),
+      requestId: req.requestId,
+    });
+    setSessionCookie(res, result.rawSessionToken, result.expiresAt);
+    res.json(result.me);
+  } catch (err) {
+    next(err);
+  }
+});
+
 authRouter.post('/login', authRateLimiter, validateBody(loginSchema), async (req, res, next) => {
   try {
     const result = await loginWithPassword(req.body, {
@@ -40,13 +78,7 @@ authRouter.post('/login', authRateLimiter, validateBody(loginSchema), async (req
       requestId: req.requestId,
     });
 
-    res.cookie(SESSION_COOKIE_NAME, result.rawSessionToken, {
-      httpOnly: true,
-      secure: env.COOKIE_SECURE,
-      sameSite: 'lax',
-      expires: result.expiresAt,
-      path: '/',
-    });
+    setSessionCookie(res, result.rawSessionToken, result.expiresAt);
 
     res.json(result.me);
   } catch (err) {

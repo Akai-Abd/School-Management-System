@@ -147,9 +147,94 @@ export async function bootstrapStandalone() {
   console.log(`Bootstrapped standalone school (${schoolSlug}) and admin (${adminEmail}).`);
 }
 
+const DEMO_USERS: Array<{
+  roleKey: (typeof SYSTEM_ROLE_KEYS)[number];
+  email: string;
+  fullName: string;
+  isPlatformAdmin?: boolean;
+  permissionPrefixes: string[];
+}> = [
+  { roleKey: 'super_admin', email: 'superadmin@school.local', fullName: 'Platform Superadmin', isPlatformAdmin: true, permissionPrefixes: [] },
+  { roleKey: 'teacher', email: 'teacher@school.local', fullName: 'Demo Teacher', permissionPrefixes: ['students.view', 'academic.view', 'attendance.', 'timetable.view', 'exams.', 'homework.'] },
+  { roleKey: 'parent', email: 'parent@school.local', fullName: 'Demo Parent', permissionPrefixes: ['students.view', 'attendance.view', 'timetable.view', 'exams.view', 'homework.view', 'fees.view', 'communications.view'] },
+  { roleKey: 'student', email: 'student@school.local', fullName: 'Demo Student', permissionPrefixes: ['academic.view', 'attendance.view', 'timetable.view', 'exams.view', 'homework.view', 'library.view'] },
+  { roleKey: 'accountant', email: 'accountant@school.local', fullName: 'Demo Accountant', permissionPrefixes: ['students.view', 'fees.', 'accounting.', 'reports.view'] },
+  { roleKey: 'librarian', email: 'librarian@school.local', fullName: 'Demo Librarian', permissionPrefixes: ['students.view', 'library.'] },
+  { roleKey: 'driver', email: 'driver@school.local', fullName: 'Demo Driver', permissionPrefixes: ['transport.'] },
+];
+
+export async function seedDemoRoleUsers() {
+  if (process.env.NODE_ENV === 'production' || process.env.ENABLE_DEMO_QUICK_SIGNIN !== 'true') {
+    return;
+  }
+
+  const school = await prisma.school.findFirst({ where: { deletedAt: null }, orderBy: { createdAt: 'asc' } });
+  if (!school) return;
+
+  const demoPassword = process.env.DEMO_USER_PASSWORD ?? process.env.BOOTSTRAP_ADMIN_PASSWORD ?? 'ChangeMe123!';
+  const passwordHash = await argon2.hash(demoPassword, { type: argon2.argon2id });
+  const allPermissions = await prisma.permission.findMany();
+
+  for (const spec of DEMO_USERS) {
+    let user = await prisma.user.findFirst({ where: { email: spec.email, deletedAt: null } });
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          email: spec.email,
+          passwordHash,
+          fullName: spec.fullName,
+          isPlatformAdmin: Boolean(spec.isPlatformAdmin),
+        },
+      });
+    } else if (spec.isPlatformAdmin && !user.isPlatformAdmin) {
+      user = await prisma.user.update({ where: { id: user.id }, data: { isPlatformAdmin: true } });
+    }
+
+    const membership = await prisma.schoolMembership.upsert({
+      where: { schoolId_userId: { schoolId: school.id, userId: user.id } },
+      update: { status: 'active' },
+      create: { schoolId: school.id, userId: user.id },
+    });
+
+    const roleKey = spec.roleKey === 'super_admin' ? 'school_admin' : spec.roleKey;
+    let role = await prisma.role.findFirst({ where: { schoolId: school.id, key: roleKey, deletedAt: null } });
+    if (!role) {
+      role = await prisma.role.create({
+        data: {
+          schoolId: school.id,
+          key: roleKey,
+          name: roleKey.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+          isSystem: true,
+        },
+      });
+    }
+
+    if (spec.permissionPrefixes.length > 0) {
+      const matching = allPermissions.filter((p) =>
+        spec.permissionPrefixes.some((prefix) => p.code.startsWith(prefix)),
+      );
+      if (matching.length > 0) {
+        await prisma.rolePermission.createMany({
+          data: matching.map((p) => ({ roleId: role.id, schoolId: school.id, permissionId: p.id })),
+          skipDuplicates: true,
+        });
+      }
+    }
+
+    await prisma.userRole.upsert({
+      where: { schoolMembershipId_roleId: { schoolMembershipId: membership.id, roleId: role.id } },
+      update: {},
+      create: { schoolMembershipId: membership.id, schoolId: school.id, roleId: role.id },
+    });
+  }
+
+  console.log(`Seeded ${DEMO_USERS.length} demo quick-signin accounts for school (${school.slug}).`);
+}
+
 async function main() {
   await seedPermissions();
   await bootstrapStandalone();
+  await seedDemoRoleUsers();
 }
 
 main()

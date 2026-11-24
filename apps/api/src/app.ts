@@ -1,3 +1,5 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
@@ -88,6 +90,8 @@ export function createApp() {
   app.use('/api/v1/dashboards', dashboardsRouter);
   app.use('/api/v1/reports', reportsRouter);
   app.use('/api/v1/me', meRouter);
+  const publicAssetsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../public/assets');
+  app.use('/public/assets', express.static(publicAssetsDir, { maxAge: '7d' }));
   app.use('/public', publicWebsiteRouter);
   app.use('/api/v1/staff', staffRouter);
   app.use('/api/v1/students', studentsRouter);

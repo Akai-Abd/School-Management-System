@@ -1,5 +1,11 @@
 import argon2 from 'argon2';
-import type { AcceptInviteInput, AuthMeResponse, LoginInput, ResetPasswordInput } from '@school-erp/contracts';
+import type {
+  AcceptInviteInput,
+  AuthMeResponse,
+  DemoQuickSigninRole,
+  LoginInput,
+  ResetPasswordInput,
+} from '@school-erp/contracts';
 import { env } from '../../config/env.js';
 import { recordAuditLog } from '../../lib/audit.js';
 import { AppError, Errors } from '../../lib/errors.js';
@@ -89,9 +95,55 @@ export function isLoginLockedOut(recentFailedCount: number): boolean {
   return recentFailedCount >= LOGIN_LOCKOUT_THRESHOLD;
 }
 
+const REMEMBER_ME_TTL_HOURS = 24 * 30;
+
+interface LoginMeta {
+  ipAddress?: string;
+  userAgent?: string;
+  requestId?: string;
+}
+
+async function issueUserSession(
+  userId: string,
+  activeSchoolId: string | null,
+  action: 'auth.login' | 'auth.quick_signin',
+  meta: LoginMeta,
+  rememberMe?: boolean,
+): Promise<LoginResult> {
+  const rawSessionToken = generateOpaqueToken(32);
+  const csrfToken = generateOpaqueToken(24);
+  const ttlHours = rememberMe ? Math.max(env.SESSION_TTL_HOURS, REMEMBER_ME_TTL_HOURS) : env.SESSION_TTL_HOURS;
+  const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000);
+
+  await prisma.session.create({
+    data: {
+      tokenHash: hashToken(rawSessionToken),
+      csrfToken,
+      userId,
+      activeSchoolId,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      expiresAt,
+    },
+  });
+
+  await recordAuditLog({
+    schoolId: activeSchoolId,
+    actorUserId: userId,
+    action,
+    entityType: 'user',
+    entityId: userId,
+    ipAddress: meta.ipAddress,
+    requestId: meta.requestId,
+  });
+
+  const me = await buildAuthMe(userId, activeSchoolId, csrfToken);
+  return { rawSessionToken, expiresAt, me };
+}
+
 export async function loginWithPassword(
   input: LoginInput,
-  meta: { ipAddress?: string; userAgent?: string; requestId?: string },
+  meta: LoginMeta,
 ): Promise<LoginResult> {
   const windowStart = new Date(Date.now() - LOGIN_LOCKOUT_WINDOW_MS);
   const recentFailures = await prisma.loginAttempt.count({
@@ -167,34 +219,50 @@ export async function loginWithPassword(
     throw Errors.forbidden('No active school membership');
   }
 
-  const rawSessionToken = generateOpaqueToken(32);
-  const csrfToken = generateOpaqueToken(24);
-  const expiresAt = new Date(Date.now() + env.SESSION_TTL_HOURS * 60 * 60 * 1000);
+  return issueUserSession(user.id, activeSchoolId, 'auth.login', meta, input.rememberMe);
+}
 
-  await prisma.session.create({
-    data: {
-      tokenHash: hashToken(rawSessionToken),
-      csrfToken,
-      userId: user.id,
-      activeSchoolId,
-      ipAddress: meta.ipAddress,
-      userAgent: meta.userAgent,
-      expiresAt,
+/** Development/demo-only passwordless role login; always disabled in production. */
+export async function quickSigninAsDemoRole(
+  roleKey: DemoQuickSigninRole,
+  meta: LoginMeta,
+): Promise<LoginResult> {
+  if (env.NODE_ENV === 'production' || !env.ENABLE_DEMO_QUICK_SIGNIN) {
+    throw Errors.notFound('Quick sign-in is disabled');
+  }
+
+  const user = await prisma.user.findFirst({
+    where: roleKey === 'super_admin'
+      ? { isPlatformAdmin: true, isActive: true, deletedAt: null }
+      : {
+          isActive: true,
+          deletedAt: null,
+          memberships: {
+            some: {
+              status: 'active',
+              school: { status: 'active', deletedAt: null },
+              userRoles: { some: { role: { key: roleKey, deletedAt: null } } },
+            },
+          },
+        },
+    include: {
+      memberships: {
+        where: { status: 'active', school: { status: 'active', deletedAt: null } },
+        orderBy: { createdAt: 'asc' },
+      },
     },
+    orderBy: { createdAt: 'asc' },
   });
 
-  await recordAuditLog({
-    schoolId: activeSchoolId,
-    actorUserId: user.id,
-    action: 'auth.login',
-    entityType: 'user',
-    entityId: user.id,
-    ipAddress: meta.ipAddress,
-    requestId: meta.requestId,
-  });
+  if (!user) {
+    throw Errors.notFound(`Demo account for role "${roleKey}" is not seeded`);
+  }
 
-  const me = await buildAuthMe(user.id, activeSchoolId, csrfToken);
-  return { rawSessionToken, expiresAt, me };
+  const activeSchoolId = user.memberships[0]?.schoolId ?? (user.isPlatformAdmin ? null : (() => {
+    throw Errors.forbidden('No active school membership');
+  })());
+
+  return issueUserSession(user.id, activeSchoolId, 'auth.quick_signin', meta);
 }
 
 export async function switchActiveSchool(

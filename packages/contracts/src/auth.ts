@@ -1,8 +1,26 @@
 import { z } from 'zod';
 
+export const DEMO_QUICK_SIGNIN_ROLES = [
+  'super_admin',
+  'school_admin',
+  'teacher',
+  'parent',
+  'student',
+  'accountant',
+  'librarian',
+  'driver',
+] as const;
+export type DemoQuickSigninRole = (typeof DEMO_QUICK_SIGNIN_ROLES)[number];
+
+export const quickSigninSchema = z.object({
+  role: z.enum(DEMO_QUICK_SIGNIN_ROLES),
+});
+export type QuickSigninInput = z.infer<typeof quickSigninSchema>;
+
 export const loginSchema = z.object({
   email: z.string().trim().email().toLowerCase(),
   password: z.string().min(8).max(128),
+  rememberMe: z.boolean().optional(),
   schoolId: z.string().uuid().optional(),
   totpCode: z.string().trim().regex(/^\d{6}$/, 'Expected 6-digit code').optional(),
   recoveryCode: z.string().trim().min(8).max(32).optional(),
