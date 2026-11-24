@@ -62,4 +62,95 @@ describe('Phase 5 online exams, SSR website, and role dashboards', () => {
     expect(html).toContain('Sports Day');
     expect(html).not.toContain('<script>alert(1)</script>');
   });
+
+  it('should render public admissions page form and escape error alerts', () => {
+    const html = renderPublicSchoolSite({
+      school: { name: 'EduCore Demo', slug: 'demo-school' },
+      pageSlug: 'admissions',
+      stats: { students: 8, teachers: 3, classes: 6, books: 4 },
+      teachers: [],
+      classes: [{ id: '11111111-1111-4111-8111-111111111111', name: 'Class 6', code: 'C6' }],
+      announcements: [],
+      events: [],
+      admissionFeedback: { error: '<script>xss()</script>Bad input' },
+      loginUrl: '/login',
+    });
+
+    expect(html).toContain('Online Admission Application');
+    expect(html).toContain('action="/public/demo-school/admissions/apply"');
+    expect(html).toContain('Class 6');
+    expect(html).not.toContain('<script>xss()</script>');
+  });
+
+  it('should render public contact page form and school contact cards', () => {
+    const html = renderPublicSchoolSite({
+      school: { name: 'EduCore Demo', slug: 'demo-school' },
+      pageSlug: 'contact',
+      settings: {
+        tagline: null,
+        principalMessage: null,
+        contactEmail: 'info@educore.com',
+        contactPhone: '+977-1-5551234',
+        address: '12 Knowledge Avenue',
+        seoDescription: null,
+      },
+      stats: { students: 8, teachers: 3, classes: 6, books: 4 },
+      teachers: [],
+      classes: [],
+      announcements: [],
+      events: [],
+      admissionFeedback: { submitted: true },
+      loginUrl: '/login',
+    });
+
+    expect(html).toContain('Contact Us');
+    expect(html).toContain('We would love to hear from you');
+    expect(html).toContain('action="/public/demo-school/contact/submit"');
+    expect(html).toContain('12 Knowledge Avenue');
+    expect(html).toContain('Your message has been sent');
+  });
+
+  it('should render classes, news & notices, and detailed teacher cards', () => {
+    const classesHtml = renderPublicSchoolSite({
+      school: { name: 'EduCore Demo', slug: 'demo-school' },
+      pageSlug: 'classes',
+      stats: { students: 8, teachers: 3, classes: 1, books: 4 },
+      teachers: [],
+      classes: [{ id: '1', name: 'Class 9', code: 'C9', studentCount: 2, sections: ['A', 'B'], subjects: ['Mathematics', 'Science'] }],
+      announcements: [],
+      events: [],
+      loginUrl: '/login',
+    });
+    expect(classesHtml).toContain('2 students');
+    expect(classesHtml).toContain('Sections: A, B');
+    expect(classesHtml).toContain('Mathematics');
+
+    const newsHtml = renderPublicSchoolSite({
+      school: { name: 'EduCore Demo', slug: 'demo-school' },
+      pageSlug: 'news',
+      stats: { students: 8, teachers: 3, classes: 1, books: 4 },
+      teachers: [],
+      classes: [],
+      announcements: [{ title: 'Staff Workshop', body: 'Monday 2 PM', createdAt: new Date('2026-11-20') }],
+      events: [],
+      loginUrl: '/login',
+    });
+    expect(newsHtml).toContain('News &amp; Notices');
+    expect(newsHtml).toContain('Staff Workshop');
+
+    const teachersHtml = renderPublicSchoolSite({
+      school: { name: 'EduCore Demo', slug: 'demo-school' },
+      pageSlug: 'teachers',
+      stats: { students: 8, teachers: 3, classes: 1, books: 4 },
+      teachers: [{ fullName: 'David Miller', designation: 'Senior Teacher', specialization: 'Science', qualifications: 'M.Sc. Physics', experienceYears: 8 }],
+      classes: [],
+      announcements: [],
+      events: [],
+      loginUrl: '/login',
+    });
+    expect(teachersHtml).toContain('Our Teachers');
+    expect(teachersHtml).toContain('Senior Teacher');
+    expect(teachersHtml).toContain('M.Sc. Physics');
+    expect(teachersHtml).toContain('8 years experience');
+  });
 });

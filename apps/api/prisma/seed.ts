@@ -161,6 +161,7 @@ const DEMO_USERS: Array<{
   { roleKey: 'accountant', email: 'accountant@school.local', fullName: 'Demo Accountant', permissionPrefixes: ['students.view', 'fees.', 'accounting.', 'reports.view'] },
   { roleKey: 'librarian', email: 'librarian@school.local', fullName: 'Demo Librarian', permissionPrefixes: ['students.view', 'library.'] },
   { roleKey: 'driver', email: 'driver@school.local', fullName: 'Demo Driver', permissionPrefixes: ['transport.'] },
+  { roleKey: 'hostel_warden', email: 'warden@school.local', fullName: 'Demo Hostel Warden', permissionPrefixes: ['students.view', 'hostel.'] },
 ];
 
 export async function seedDemoRoleUsers() {
@@ -231,10 +232,221 @@ export async function seedDemoRoleUsers() {
   console.log(`Seeded ${DEMO_USERS.length} demo quick-signin accounts for school (${school.slug}).`);
 }
 
+export async function seedDemoShowcaseData() {
+  if (process.env.NODE_ENV === 'production' || process.env.ENABLE_DEMO_QUICK_SIGNIN !== 'true') {
+    return;
+  }
+
+  const school = await prisma.school.findFirst({ where: { deletedAt: null }, orderBy: { createdAt: 'asc' } });
+  if (!school) return;
+
+  await prisma.websiteSetting.upsert({
+    where: { schoolId: school.id },
+    update: {},
+    create: {
+      schoolId: school.id,
+      tagline: 'A nurturing environment where curiosity meets excellence.',
+      principalMessage: `${school.name} provides a nurturing, technology-enabled learning environment for students from Class 6 to Class 10. Our experienced faculty, modern laboratories and student-centred approach help every learner reach their potential.`,
+      address: '12 Knowledge Avenue, Kathmandu',
+      contactPhone: '+977-1-5551234',
+      contactEmail: 'info@educore.com',
+      seoDescription: 'A modern school management system and public school website.',
+    },
+  });
+
+  if ((await prisma.websiteAnnouncement.count({ where: { schoolId: school.id } })) === 0) {
+    await prisma.websiteAnnouncement.createMany({
+      data: [
+        {
+          schoolId: school.id,
+          title: 'Staff Development Workshop',
+          body: 'All teaching staff are invited to a pedagogy workshop next Monday at 2:00 PM in the conference room.',
+          isPublished: true,
+          publishedAt: new Date('2026-11-20T09:00:00.000Z'),
+          createdAt: new Date('2026-11-20T09:00:00.000Z'),
+        },
+        {
+          schoolId: school.id,
+          title: 'Parent-Teacher Meeting',
+          body: 'A parent-teacher meeting will be held this Friday from 10:00 AM to 1:00 PM in the main hall. All parents are encouraged to attend.',
+          isPublished: true,
+          publishedAt: new Date('2026-11-18T09:00:00.000Z'),
+          createdAt: new Date('2026-11-18T09:00:00.000Z'),
+        },
+        {
+          schoolId: school.id,
+          title: 'Term Examination Schedule Published',
+          body: 'The schedule for the first terminal examination is now available. Students should download the timetable from their dashboard.',
+          isPublished: true,
+          publishedAt: new Date('2026-11-14T09:00:00.000Z'),
+          createdAt: new Date('2026-11-14T09:00:00.000Z'),
+        },
+      ],
+    });
+  }
+
+  if ((await prisma.websiteEvent.count({ where: { schoolId: school.id } })) === 0) {
+    await prisma.websiteEvent.createMany({
+      data: [
+        {
+          schoolId: school.id,
+          title: 'Annual Sports Day',
+          eventDate: new Date('2026-12-02T00:00:00.000Z'),
+          description: 'Inter-house athletics and team sports for all classes — School Ground.',
+          isPublished: true,
+        },
+        {
+          schoolId: school.id,
+          title: 'Science Exhibition',
+          eventDate: new Date('2026-12-15T00:00:00.000Z'),
+          description: 'Students present science projects and experiments — Main Hall.',
+          isPublished: true,
+        },
+        {
+          schoolId: school.id,
+          title: 'Independence Day Celebration',
+          eventDate: new Date('2026-12-30T00:00:00.000Z'),
+          description: 'Cultural programme and flag ceremony — Assembly Ground.',
+          isPublished: true,
+        },
+      ],
+    });
+  }
+
+  if ((await prisma.staff.count({ where: { schoolId: school.id, isTeacher: true, deletedAt: null } })) === 0) {
+    const ensureDesignation = async (name: string) => {
+      const existing = await prisma.designation.findFirst({ where: { schoolId: school.id, name, deletedAt: null } });
+      return existing ?? prisma.designation.create({ data: { schoolId: school.id, name } });
+    };
+    const seniorDesig = await ensureDesignation('Senior Teacher');
+    const teacherDesig = await ensureDesignation('Teacher');
+
+    const teachers = [
+      { code: 'EMP-101', name: 'David Miller', designationId: seniorDesig.id, spec: 'Science', qual: 'M.Sc. Physics', exp: 8 },
+      { code: 'EMP-102', name: 'John Carter', designationId: teacherDesig.id, spec: 'English', qual: 'M.A. English', exp: 5 },
+      { code: 'EMP-103', name: 'Priya Sharma', designationId: teacherDesig.id, spec: 'Mathematics', qual: 'M.Sc. Mathematics', exp: 6 },
+    ];
+    for (const t of teachers) {
+      const staff = await prisma.staff.create({
+        data: {
+          schoolId: school.id,
+          employeeCode: t.code,
+          fullName: t.name,
+          designationId: t.designationId,
+          joiningDate: new Date('2022-04-01T00:00:00.000Z'),
+          isTeacher: true,
+        },
+      });
+      await prisma.teacherProfile.create({
+        data: {
+          schoolId: school.id,
+          staffId: staff.id,
+          specialization: t.spec,
+          qualifications: t.qual,
+          experienceYears: t.exp,
+        },
+      });
+    }
+  }
+
+  if ((await prisma.schoolClass.count({ where: { schoolId: school.id, deletedAt: null } })) === 0) {
+    let year = await prisma.academicYear.findFirst({ where: { schoolId: school.id, deletedAt: null } });
+    if (!year) {
+      year = await prisma.academicYear.create({
+        data: {
+          schoolId: school.id,
+          name: '2026-2027',
+          startDate: new Date('2026-04-01T00:00:00.000Z'),
+          endDate: new Date('2027-03-31T00:00:00.000Z'),
+          isCurrent: true,
+        },
+      });
+    }
+
+    const subjectDefs = [
+      { name: 'Mathematics', code: 'MATH' },
+      { name: 'English', code: 'ENG' },
+      { name: 'Science', code: 'SCI' },
+      { name: 'Social Studies', code: 'SOC' },
+      { name: 'Computer Science', code: 'CS' },
+      { name: 'Physical Education', code: 'PE' },
+    ];
+    const subjectsByCode: Record<string, string> = {};
+    for (const s of subjectDefs) {
+      const existing = await prisma.subject.findFirst({ where: { schoolId: school.id, code: s.code, deletedAt: null } });
+      const sub = existing ?? (await prisma.subject.create({ data: { schoolId: school.id, name: s.name, code: s.code } }));
+      subjectsByCode[s.code] = sub.id;
+    }
+
+    const classDefs = [
+      { name: 'Grade 11', code: 'G11', order: 1, sections: ['B'], subjectCodes: ['CS'] },
+      { name: 'Class 6', code: 'C6', order: 2, sections: ['A', 'B'], subjectCodes: ['MATH', 'ENG', 'SCI', 'SOC', 'CS', 'PE'] },
+      { name: 'Class 7', code: 'C7', order: 3, sections: ['A', 'B'], subjectCodes: ['MATH', 'ENG', 'SCI', 'SOC', 'CS', 'PE'] },
+      { name: 'Class 8', code: 'C8', order: 4, sections: ['A', 'B'], subjectCodes: ['MATH', 'ENG', 'SCI', 'SOC', 'CS', 'PE'] },
+      { name: 'Class 9', code: 'C9', order: 5, sections: ['A', 'B'], subjectCodes: ['MATH', 'ENG', 'SCI', 'SOC', 'CS', 'PE'], students: 2 },
+      { name: 'Class 10', code: 'C10', order: 6, sections: ['A', 'B'], subjectCodes: ['MATH', 'ENG', 'SCI', 'SOC', 'CS', 'PE'], students: 6 },
+    ];
+
+    let admSeq = 1;
+    for (const c of classDefs) {
+      const cls = await prisma.schoolClass.create({
+        data: { schoolId: school.id, name: c.name, code: c.code, displayOrder: c.order },
+      });
+      const createdSections = [];
+      for (const secName of c.sections) {
+        createdSections.push(await prisma.section.create({ data: { schoolId: school.id, classId: cls.id, name: secName } }));
+      }
+      for (const subCode of c.subjectCodes) {
+        await prisma.classSubject.create({
+          data: { schoolId: school.id, academicYearId: year.id, classId: cls.id, subjectId: subjectsByCode[subCode]! },
+        });
+      }
+      if (c.students && (await prisma.student.count({ where: { schoolId: school.id } })) < 8) {
+        for (let idx = 0; idx < c.students; idx++) {
+          const num = admSeq++;
+          const st = await prisma.student.create({
+            data: {
+              schoolId: school.id,
+              admissionNumber: `ADM-${String(num).padStart(4, '0')}`,
+              firstName: 'Student',
+              lastName: String(num),
+              dateOfBirth: new Date('2011-05-15T00:00:00.000Z'),
+              gender: num % 2 === 0 ? 'female' : 'male',
+            },
+          });
+          await prisma.studentEnrollment.create({
+            data: {
+              schoolId: school.id,
+              studentId: st.id,
+              academicYearId: year.id,
+              classId: cls.id,
+              sectionId: createdSections[idx % createdSections.length]!.id,
+            },
+          });
+        }
+      }
+    }
+  }
+
+  if ((await prisma.book.count({ where: { schoolId: school.id } })) === 0) {
+    await prisma.book.createMany({
+      data: [
+        { schoolId: school.id, title: 'Conceptual Physics', author: 'Paul G. Hewitt' },
+        { schoolId: school.id, title: 'Higher Algebra', author: 'H. S. Hall' },
+        { schoolId: school.id, title: 'Modern English Grammar', author: 'Raymond Murphy' },
+        { schoolId: school.id, title: 'Introduction to Computing', author: 'Peter Norton' },
+      ],
+    });
+  }
+
+  console.log(`Seeded EduCore showcase content for school (${school.slug}).`);
+}
+
 async function main() {
   await seedPermissions();
   await bootstrapStandalone();
   await seedDemoRoleUsers();
+  await seedDemoShowcaseData();
 }
 
 main()

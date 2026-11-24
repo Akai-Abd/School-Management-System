@@ -62,10 +62,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function logout() {
-    await apiFetch<void>('/api/v1/auth/logout', { method: 'POST' });
-    setCsrfToken(null);
-    queryClient.setQueryData(['auth', 'me'], null);
-    queryClient.clear();
+    try {
+      await apiFetch<void>('/api/v1/auth/logout', { method: 'POST' });
+    } catch {
+      // Clear local auth state even if the server session already expired or was revoked.
+    } finally {
+      setCsrfToken(null);
+      queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'auth' });
+      queryClient.setQueryData(['auth', 'me'], null);
+    }
   }
 
   async function switchSchool(schoolId: string | null) {

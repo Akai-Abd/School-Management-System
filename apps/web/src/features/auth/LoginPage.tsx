@@ -17,6 +17,7 @@ const QUICK_ROLES: Array<{ role: DemoQuickSigninRole; label: string; icon: strin
   { role: 'accountant', label: 'Accountant', icon: 'bi-calculator-fill' },
   { role: 'librarian', label: 'Librarian', icon: 'bi-book-half' },
   { role: 'driver', label: 'Driver', icon: 'bi-bus-front-fill' },
+  { role: 'hostel_warden', label: 'Hostel', icon: 'bi-building' },
 ];
 
 export function LoginPage() {

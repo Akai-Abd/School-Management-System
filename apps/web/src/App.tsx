@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from './components/AppLayout';
 import { LoadingState } from './components/States';
@@ -24,10 +25,19 @@ import { StudentsPage } from './features/students/StudentsPage';
 import { TimetablePage } from './features/timetable/TimetablePage';
 import { WebsitePage } from './features/website/WebsitePage';
 
-function ProtectedShell() {
+function LandingRedirect() {
+  useEffect(() => {
+    window.location.replace('/public');
+  }, []);
+  return <LoadingState label="Opening school website..." />;
+}
+
+function ProtectedShell({ redirectUnauthenticatedTo }: { redirectUnauthenticatedTo?: 'login' | 'landing' }) {
   const { session, isLoading } = useAuth();
   if (isLoading) return <LoadingState label="Checking session..." />;
-  if (!session) return <Navigate to="/login" replace />;
+  if (!session) {
+    return redirectUnauthenticatedTo === 'landing' ? <LandingRedirect /> : <Navigate to="/login" replace />;
+  }
   return <AppLayout />;
 }
 
@@ -37,8 +47,10 @@ export function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
-      <Route element={<ProtectedShell />}>
+      <Route element={<ProtectedShell redirectUnauthenticatedTo="landing" />}>
         <Route path="/" element={<DashboardPage />} />
+      </Route>
+      <Route element={<ProtectedShell />}>
         <Route path="/academic" element={<AcademicPage />} />
         <Route path="/students" element={<StudentsPage />} />
         <Route path="/staff" element={<StaffPage />} />

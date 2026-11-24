@@ -94,6 +94,8 @@ const TENANT_SCOPED_MODELS = new Set([
   'WebsitePage',
   'WebsiteAnnouncement',
   'WebsiteEvent',
+  'AdmissionApplication',
+  'ContactInquiry',
 ]);
 
 /**

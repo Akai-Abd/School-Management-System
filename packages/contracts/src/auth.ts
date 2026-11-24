@@ -9,6 +9,7 @@ export const DEMO_QUICK_SIGNIN_ROLES = [
   'accountant',
   'librarian',
   'driver',
+  'hostel_warden',
 ] as const;
 export type DemoQuickSigninRole = (typeof DEMO_QUICK_SIGNIN_ROLES)[number];
 

@@ -24,7 +24,7 @@ export function AuthCardLayout({ title, subtitle, narrow = false, children }: Au
 
         <div className="auth-footer">
           <div>
-            <a href="/public/demo-school" style={{ color: '#4f46e5', fontWeight: 600 }}>
+            <a href="/public" style={{ color: '#4f46e5', fontWeight: 600 }}>
               Visit Public School Website
             </a>
           </div>

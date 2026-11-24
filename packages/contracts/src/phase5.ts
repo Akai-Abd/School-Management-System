@@ -72,3 +72,32 @@ export const createWebsiteEventSchema = z.object({
   description: z.string().trim().max(1000).optional(),
   isPublished: z.boolean().default(true),
 });
+
+export const createAdmissionApplicationSchema = z.object({
+  studentName: z.string().trim().min(2).max(150),
+  dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD date of birth'),
+  gender: z.enum(['', 'male', 'female', 'other']).optional(),
+  classId: z.string().uuid().optional().or(z.literal('')),
+  guardianName: z.string().trim().min(2).max(150),
+  phone: z.string().trim().min(5).max(50),
+  email: z.string().trim().email().max(150),
+  previousSchool: z.string().trim().max(180).optional(),
+  address: z.string().trim().max(255).optional(),
+  message: z.string().trim().max(2000).optional(),
+});
+
+export const updateAdmissionStatusSchema = z.object({
+  status: z.enum(['pending', 'reviewed', 'accepted', 'rejected']),
+});
+
+export const createContactInquirySchema = z.object({
+  name: z.string().trim().min(2).max(150),
+  email: z.string().trim().email().max(150),
+  phone: z.string().trim().max(50).optional(),
+  subject: z.string().trim().max(180).optional(),
+  message: z.string().trim().min(2).max(3000),
+});
+
+export const updateInquiryStatusSchema = z.object({
+  status: z.enum(['new', 'resolved']),
+});

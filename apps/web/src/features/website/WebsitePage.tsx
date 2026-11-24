@@ -16,6 +16,27 @@ interface WebsiteResponse {
   pages: Array<{ id: string; slug: string; title: string; status: string }>;
   announcements: Array<{ id: string; title: string; body: string; isPublished: boolean }>;
   events: Array<{ id: string; title: string; eventDate: string; description: string | null; isPublished: boolean }>;
+  admissions?: Array<{
+    id: string;
+    studentName: string;
+    dateOfBirth: string;
+    guardianName: string;
+    phone: string;
+    email: string;
+    status: string;
+    createdAt: string;
+    schoolClass: { name: string } | null;
+  }>;
+  inquiries?: Array<{
+    id: string;
+    name: string;
+    email: string;
+    phone: string | null;
+    subject: string | null;
+    message: string;
+    status: string;
+    createdAt: string;
+  }>;
 }
 
 export function WebsitePage() {
@@ -53,6 +74,20 @@ export function WebsitePage() {
     mutationFn: (body: Record<string, unknown>) => apiFetch('/api/v1/website/events', { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: async () => { setNotice('Upcoming event added.'); await invalidate(); },
     onError: onErr('Failed to add event'),
+  });
+
+  const updateAdmission = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      apiFetch(`/api/v1/website/admissions/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+    onSuccess: async () => { setNotice('Admission application status updated.'); await invalidate(); },
+    onError: onErr('Failed to update admission status'),
+  });
+
+  const updateInquiry = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      apiFetch(`/api/v1/website/inquiries/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+    onSuccess: async () => { setNotice('Contact inquiry status updated.'); await invalidate(); },
+    onError: onErr('Failed to update inquiry status'),
   });
 
   if (webQuery.isLoading) return <LoadingState label="Loading school website..." />;
@@ -191,6 +226,84 @@ export function WebsitePage() {
               ))}
             </tbody>
           </table>
+        )}
+      </div>
+
+      <div className="card border-0 shadow-sm p-3">
+        <h2 className="h5 mb-3">Online Admission Applications</h2>
+        {!(webQuery.data?.admissions?.length) ? (
+          <EmptyState title="No Applications Yet" description="Applications submitted on the public Admissions page appear here." />
+        ) : (
+          <div className="table-responsive">
+            <table className="table table-sm align-middle mb-0">
+              <thead><tr><th>Student</th><th>Class</th><th>Guardian</th><th>Contact</th><th>Submitted</th><th>Status</th></tr></thead>
+              <tbody>
+                {webQuery.data.admissions.map((app) => (
+                  <tr key={app.id}>
+                    <td>{app.studentName}</td>
+                    <td>{app.schoolClass?.name ?? 'General'}</td>
+                    <td>{app.guardianName}</td>
+                    <td><div className="small">{app.phone}</div><div className="small text-muted">{app.email}</div></td>
+                    <td className="small text-muted">{app.createdAt.slice(0, 10)}</td>
+                    <td>
+                      <select
+                        className="form-select form-select-sm"
+                        style={{ width: 'auto' }}
+                        value={app.status}
+                        aria-label={`Status for ${app.studentName}`}
+                        onChange={(e) => updateAdmission.mutate({ id: app.id, status: e.target.value })}
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="reviewed">Reviewed</option>
+                        <option value="accepted">Accepted</option>
+                        <option value="rejected">Rejected</option>
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="card border-0 shadow-sm p-3">
+        <h2 className="h5 mb-3">Contact Inquiries</h2>
+        {!(webQuery.data?.inquiries?.length) ? (
+          <EmptyState title="No Contact Messages" description="Messages submitted on the public Contact page appear here." />
+        ) : (
+          <div className="table-responsive">
+            <table className="table table-sm align-middle mb-0">
+              <thead><tr><th>From</th><th>Subject &amp; Message</th><th>Received</th><th>Status</th></tr></thead>
+              <tbody>
+                {webQuery.data.inquiries.map((inq) => (
+                  <tr key={inq.id}>
+                    <td>
+                      <div>{inq.name}</div>
+                      <div className="small text-muted">{inq.email}{inq.phone ? ` · ${inq.phone}` : ''}</div>
+                    </td>
+                    <td>
+                      <div className="fw-semibold small">{inq.subject || 'General Inquiry'}</div>
+                      <div className="small text-muted">{inq.message}</div>
+                    </td>
+                    <td className="small text-muted">{inq.createdAt.slice(0, 10)}</td>
+                    <td>
+                      <select
+                        className="form-select form-select-sm"
+                        style={{ width: 'auto' }}
+                        value={inq.status}
+                        aria-label={`Status for ${inq.name}`}
+                        onChange={(e) => updateInquiry.mutate({ id: inq.id, status: e.target.value })}
+                      >
+                        <option value="new">New</option>
+                        <option value="resolved">Resolved</option>
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

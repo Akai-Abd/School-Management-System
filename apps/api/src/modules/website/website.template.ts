@@ -29,10 +29,24 @@ export interface PublicSiteRenderInput {
     seoDescription: string | null;
   } | null;
   stats: { students: number; teachers: number; classes: number; books: number };
-  teachers: Array<{ fullName: string; specialization: string | null }>;
-  classes: Array<{ name: string; code: string | null }>;
+  teachers: Array<{
+    fullName: string;
+    specialization: string | null;
+    designation?: string | null;
+    qualifications?: string | null;
+    experienceYears?: number | null;
+  }>;
+  classes: Array<{
+    id?: string;
+    name: string;
+    code: string | null;
+    studentCount?: number;
+    sections?: string[];
+    subjects?: string[];
+  }>;
   announcements: Array<{ title: string; body: string; createdAt: Date }>;
   events: Array<{ title: string; eventDate: Date; description: string | null }>;
+  admissionFeedback?: { submitted?: boolean; error?: string | null };
   loginUrl: string;
 }
 
@@ -43,6 +57,16 @@ function initials(name: string): string {
     .slice(0, 2)
     .map((p) => p[0]!.toUpperCase())
     .join('');
+}
+
+function renderFormAlert(feedback: PublicSiteRenderInput['admissionFeedback'], successMessage: string): string {
+  if (feedback?.submitted) {
+    return `<div class="alert alert-success" role="alert">${escapeHtml(successMessage)}</div>`;
+  }
+  if (feedback?.error) {
+    return `<div class="alert alert-danger" role="alert">${escapeHtml(feedback.error)}</div>`;
+  }
+  return '';
 }
 
 const NAV_ITEMS: Array<[string, string]> = [
@@ -66,7 +90,7 @@ const GALLERY_CARDS: Array<[string, string]> = [
 ];
 
 export function renderPublicSchoolSite(input: PublicSiteRenderInput): string {
-  const { school, pageSlug, customPage, settings, stats, teachers, classes, announcements, events, loginUrl } = input;
+  const { school, pageSlug, customPage, settings, stats, teachers, classes, announcements, events, admissionFeedback, loginUrl } = input;
   const base = `/public/${encodeURIComponent(school.slug)}`;
   const schoolName = escapeHtml(school.name);
   const tagline = escapeHtml(settings?.tagline ?? 'A nurturing environment where curiosity meets excellence.');
@@ -74,7 +98,14 @@ export function renderPublicSchoolSite(input: PublicSiteRenderInput): string {
     settings?.principalMessage ??
       `${school.name} provides a nurturing, technology-enabled learning environment with modern laboratories, library resources, and student-centred instruction.`,
   );
-  const pageTitle = escapeHtml(customPage?.seoTitle ?? customPage?.title ?? (pageSlug === 'home' ? 'Home' : pageSlug.replace(/-/g, ' ')));
+  const defaultTitleMap: Record<string, string> = {
+    home: 'Home',
+    contact: 'Contact Us',
+    news: 'News & Notices',
+    teachers: 'Our Teachers',
+  };
+  const defaultTitle = defaultTitleMap[pageSlug] ?? pageSlug.replace(/-/g, ' ');
+  const pageTitle = escapeHtml(customPage?.seoTitle ?? customPage?.title ?? defaultTitle);
   const description = escapeHtml(
     customPage?.seoDescription ?? settings?.seoDescription ?? `${school.name} — a modern school management system and public school website.`,
   );
@@ -150,21 +181,40 @@ export function renderPublicSchoolSite(input: PublicSiteRenderInput): string {
 </footer>`;
 
   const displayTeachers = teachers.length > 0 ? teachers : [
-    { fullName: 'Senior Faculty', specialization: 'Science & Mathematics' },
-    { fullName: 'Academic Lead', specialization: 'Languages & Humanities' },
+    { fullName: 'Senior Faculty', specialization: 'Science & Mathematics', designation: 'Senior Teacher', qualifications: null, experienceYears: null },
+    { fullName: 'Academic Lead', specialization: 'Languages & Humanities', designation: 'Teacher', qualifications: null, experienceYears: null },
   ];
+
+  function formatDisplayDate(d: Date): string {
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  }
 
   const newsHtml = announcements.length
     ? announcements
+        .slice(0, 5)
         .map(
           (a) => `<div class="border-bottom py-3">
-  <div class="text-muted small mb-1"><i class="bi bi-calendar3 me-1"></i>${a.createdAt.toISOString().slice(0, 10)}</div>
+  <div class="text-muted small mb-1"><i class="bi bi-calendar3 me-1"></i>${formatDisplayDate(a.createdAt)}</div>
   <h6 class="fw-bold mb-1">${escapeHtml(a.title)}</h6>
   <p class="text-muted small mb-0">${escapeHtml(a.body)}</p>
 </div>`,
         )
         .join('')
     : '<p class="text-muted small">No announcements published yet.</p>';
+
+  const newsCardsHtml = announcements.length
+    ? `<div class="row g-4">${announcements
+        .map(
+          (a) => `<div class="col-lg-8">
+  <div class="feature-card">
+    <div class="text-muted small mb-1"><i class="bi bi-calendar3 me-1"></i>${formatDisplayDate(a.createdAt)}</div>
+    <h5 class="fw-bold">${escapeHtml(a.title)}</h5>
+    <p class="text-muted small mb-0">${escapeHtml(a.body)}</p>
+  </div>
+</div>`,
+        )
+        .join('')}</div>`
+    : '<div class="feature-card"><p class="text-muted mb-0">No announcements published yet.</p></div>';
 
   const eventsHtml = events.length
     ? events
@@ -310,20 +360,145 @@ export function renderPublicSchoolSite(input: PublicSiteRenderInput): string {
     let subBody = '';
     if (customPage) {
       subBody = `<div class="feature-card">${sanitizeRichHtml(customPage.contentHtml)}</div>`;
-    } else if (pageSlug === 'classes' || pageSlug === 'academics') {
+    } else if (pageSlug === 'classes') {
+      subBody = classes.length
+        ? `<div class="row g-4">${classes
+            .map((c) => {
+              const sectionsText = c.sections?.length ? c.sections.map(escapeHtml).join(', ') : 'General';
+              const subjectBadges = c.subjects?.length
+                ? c.subjects.map((s) => `<span class="badge bg-light text-dark border">${escapeHtml(s)}</span>`).join('')
+                : `<span class="badge bg-light text-dark border">${escapeHtml(c.code ?? 'Standard Curriculum')}</span>`;
+              return `<div class="col-md-6 col-lg-4">
+  <div class="feature-card h-100">
+    <div class="d-flex align-items-center justify-content-between">
+      <h5 class="fw-bold mb-0">${escapeHtml(c.name)}</h5>
+      <span class="badge bg-primary-subtle text-primary">${c.studentCount ?? 0} students</span>
+    </div>
+    <div class="text-muted small mt-2">Sections: ${sectionsText}</div>
+    <hr>
+    <div class="small text-muted mb-1">Subjects</div>
+    <div class="d-flex flex-wrap gap-1">${subjectBadges}</div>
+  </div>
+</div>`;
+            })
+            .join('')}</div>`
+        : '<div class="feature-card"><p class="text-muted mb-0">Academic classes are being configured for this session.</p></div>';
+    } else if (pageSlug === 'academics') {
       subBody = classes.length
         ? `<div class="row g-4">${classes.map((c) => `<div class="col-md-6 col-lg-3"><div class="feature-card"><h5 class="fw-bold">${escapeHtml(c.name)}</h5><p class="text-muted small mb-0">${escapeHtml(c.code ?? 'Standard Curriculum')}</p></div></div>`).join('')}</div>`
         : '<div class="feature-card"><p class="text-muted mb-0">Academic classes are being configured for this session.</p></div>';
     } else if (pageSlug === 'teachers') {
-      subBody = teacherCardsHtml(displayTeachers);
+      subBody = `<div class="row g-4">${displayTeachers
+        .map((t) => {
+          const metaParts = [
+            t.qualifications ? escapeHtml(t.qualifications) : '',
+            t.experienceYears && t.experienceYears > 0 ? `${t.experienceYears} years experience` : '',
+          ].filter(Boolean);
+          return `<div class="col-sm-6 col-lg-4">
+  <div class="feature-card text-center h-100">
+    <span class="avatar avatar-lg mx-auto mb-3">${escapeHtml(initials(t.fullName))}</span>
+    <h5 class="fw-bold mb-1">${escapeHtml(t.fullName)}</h5>
+    <div class="text-primary small fw-semibold">${escapeHtml(t.designation ?? 'Teacher')}</div>
+    <p class="text-muted small mt-2 mb-1">${escapeHtml(t.specialization ?? 'Faculty')}</p>
+    ${metaParts.length ? `<div class="small text-muted">${metaParts.join(' &middot; ')}</div>` : ''}
+  </div>
+</div>`;
+        })
+        .join('')}</div>`;
     } else if (pageSlug === 'news') {
-      subBody = `<div class="feature-card">${newsHtml}</div>`;
+      subBody = newsCardsHtml;
     } else if (pageSlug === 'events') {
       subBody = `<div class="feature-card">${eventsHtml}</div>`;
     } else if (pageSlug === 'gallery') {
       subBody = galleryHtml;
-    } else if (pageSlug === 'contact' || pageSlug === 'admissions') {
-      subBody = `<div class="feature-card"><h5 class="fw-bold mb-3">${escapeHtml(pageSlug === 'admissions' ? 'Admissions Inquiry' : 'School Contact')}</h5><p class="text-muted">${aboutText}</p><p class="mb-0"><strong>Address:</strong> ${address}<br/><strong>Phone:</strong> ${phone}<br/><strong>Email:</strong> ${email}</p></div>`;
+    } else if (pageSlug === 'admissions') {
+      const hasClasses = classes.some((c) => Boolean(c.id));
+      const classOptions = hasClasses
+        ? classes
+            .filter((c) => c.id)
+            .map((c) => `<option value="${escapeHtml(c.id!)}">${escapeHtml(c.name)}</option>`)
+            .join('')
+        : '<option value="">General Admission (Assigned at assessment)</option>';
+      const alertHtml = renderFormAlert(
+        admissionFeedback,
+        'Your admission application has been submitted. Our admissions team will contact you within two working days.',
+      );
+
+      subBody = `${alertHtml}
+<div class="row g-5">
+  <div class="col-lg-5">
+    <div class="section-eyebrow">Admissions</div>
+    <h2 class="section-heading">Join ${schoolName}</h2>
+    <div class="text-muted"><p>Admissions are open for the current academic session. Please submit the online admission form or visit the school office with the required documents. Our admissions team will contact you within two working days.</p></div>
+    <div class="feature-card mt-4">
+      <h6 class="fw-bold">How it works</h6>
+      <ol class="small text-muted mb-0 ps-3">
+        <li class="mb-2">Submit the online application form.</li>
+        <li class="mb-2">Our admissions team reviews your details.</li>
+        <li class="mb-2">You will be contacted for a placement assessment.</li>
+        <li>Complete enrolment at the school office.</li>
+      </ol>
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="card"><div class="card-body p-4">
+      <h5 class="fw-bold mb-3">Online Admission Application</h5>
+      <form action="${base}/admissions/apply" method="post" accept-charset="utf-8">
+        <div class="row g-3">
+          <div class="col-md-6"><label class="form-label">Student name *</label><input type="text" name="studentName" class="form-control" required maxlength="150"></div>
+          <div class="col-md-6"><label class="form-label">Date of birth *</label><input type="date" name="dob" class="form-control" required></div>
+          <div class="col-md-6"><label class="form-label">Gender</label><select name="gender" class="form-select"><option value="">Select</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></select></div>
+          <div class="col-md-6"><label class="form-label">Applying for class${hasClasses ? ' *' : ''}</label>
+            <select name="classId" class="form-select"${hasClasses ? ' required' : ''}>
+              ${hasClasses ? '<option value="">Select class</option>' : ''}
+              ${classOptions}
+            </select>
+          </div>
+          <div class="col-md-6"><label class="form-label">Guardian name *</label><input type="text" name="guardianName" class="form-control" required maxlength="150"></div>
+          <div class="col-md-6"><label class="form-label">Guardian phone *</label><input type="text" name="phone" class="form-control" required maxlength="50"></div>
+          <div class="col-md-6"><label class="form-label">Email address *</label><input type="email" name="email" class="form-control" required maxlength="150"></div>
+          <div class="col-md-6"><label class="form-label">Previous school</label><input type="text" name="previousSchool" class="form-control" maxlength="180"></div>
+          <div class="col-12"><label class="form-label">Home address</label><input type="text" name="address" class="form-control" maxlength="255"></div>
+          <div class="col-12"><label class="form-label">Additional information</label><textarea name="message" class="form-control" rows="3" maxlength="2000"></textarea></div>
+          <div class="col-12"><button type="submit" class="btn btn-primary px-4"><i class="bi bi-send-fill me-2"></i>Submit Application</button></div>
+        </div>
+      </form>
+    </div></div>
+  </div>
+</div>`;
+    } else if (pageSlug === 'contact') {
+      const alertHtml = renderFormAlert(
+        admissionFeedback,
+        'Thank you for reaching out. Your message has been sent to our school office.',
+      );
+      subBody = `${alertHtml}
+<div class="row g-5">
+  <div class="col-lg-5">
+    <div class="section-eyebrow">Contact</div>
+    <h2 class="section-heading">We would love to hear from you</h2>
+    <div class="text-muted mb-4"><p>${address}<br/>Phone: ${phone}<br/>Email: ${email}</p></div>
+    <div class="d-grid gap-3">
+      <div class="feature-card d-flex gap-3 align-items-start"><i class="bi bi-geo-alt-fill"></i><div><div class="fw-semibold">Address</div><div class="text-muted small">${address}</div></div></div>
+      <div class="feature-card d-flex gap-3 align-items-start"><i class="bi bi-telephone-fill"></i><div><div class="fw-semibold">Phone</div><div class="text-muted small">${phone}</div></div></div>
+      <div class="feature-card d-flex gap-3 align-items-start"><i class="bi bi-envelope"></i><div><div class="fw-semibold">Email</div><div class="text-muted small">${email}</div></div></div>
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="card"><div class="card-body p-4">
+      <h5 class="fw-bold mb-3">Send us a message</h5>
+      <form action="${base}/contact/submit" method="post" accept-charset="utf-8">
+        <div class="row g-3">
+          <div class="col-md-6"><label class="form-label">Your name *</label><input type="text" name="name" class="form-control" required maxlength="150"></div>
+          <div class="col-md-6"><label class="form-label">Email *</label><input type="email" name="email" class="form-control" required maxlength="150"></div>
+          <div class="col-md-6"><label class="form-label">Phone</label><input type="text" name="phone" class="form-control" maxlength="50"></div>
+          <div class="col-md-6"><label class="form-label">Subject</label><input type="text" name="subject" class="form-control" maxlength="180"></div>
+          <div class="col-12"><label class="form-label">Message *</label><textarea name="message" class="form-control" rows="5" required maxlength="3000"></textarea></div>
+          <div class="col-12"><button type="submit" class="btn btn-primary px-4"><i class="bi bi-send-fill me-2"></i>Send Message</button></div>
+        </div>
+      </form>
+    </div></div>
+  </div>
+</div>`;
     } else {
       subBody = `<div class="feature-card"><p class="text-muted mb-0">${aboutText}</p></div>`;
     }
