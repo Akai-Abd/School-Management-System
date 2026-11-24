@@ -65,3 +65,10 @@ export const createWebsiteAnnouncementSchema = z.object({
   body: z.string().trim().min(2).max(2000),
   isPublished: z.boolean().default(true),
 });
+
+export const createWebsiteEventSchema = z.object({
+  title: z.string().trim().min(2).max(160),
+  eventDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD date'),
+  description: z.string().trim().max(1000).optional(),
+  isPublished: z.boolean().default(true),
+});

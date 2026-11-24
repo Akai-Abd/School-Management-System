@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
 import { autoGradeObjectiveAnswer, isAttemptExpired } from '../src/modules/onlineExams/onlineExams.routes.js';
 import { sanitizeRichHtml } from '../src/modules/website/website.routes.js';
+import { renderPublicSchoolSite } from '../src/modules/website/website.template.js';
 
 describe('Phase 5 online exams, SSR website, and role dashboards', () => {
   it('should enforce server-side online exam expiry and objective auto-grading (M08-AC2/AC4)', () => {
@@ -40,5 +41,25 @@ describe('Phase 5 online exams, SSR website, and role dashboards', () => {
     expect((await request(app).get('/api/v1/online-exams')).status).toBe(401);
     expect((await request(app).get('/api/v1/website')).status).toBe(401);
     expect((await request(app).get('/api/v1/dashboards/summary')).status).toBe(401);
+  });
+
+  it('should render EduCore-style public SSR landing page with SEO tags and escaped content (M17-AC5/AC6)', () => {
+    const html = renderPublicSchoolSite({
+      school: { name: 'Demo <High> School', slug: 'demo-school' },
+      pageSlug: 'home',
+      stats: { students: 120, teachers: 15, classes: 10, books: 500 },
+      teachers: [{ fullName: 'Priya Sharma', specialization: 'Mathematics' }],
+      classes: [{ name: 'Grade 1', code: 'G1' }],
+      announcements: [{ title: 'PTM <script>alert(1)</script>', body: 'Friday 10 AM', createdAt: new Date('2026-11-18') }],
+      events: [{ title: 'Sports Day', eventDate: new Date('2026-12-02'), description: 'School Ground' }],
+      loginUrl: 'http://localhost:5173/login',
+    });
+
+    expect(html).toContain('Learning Today, Leading Tomorrow');
+    expect(html).toContain('<meta name="description"');
+    expect(html).toContain('<link rel="canonical" href="/public/demo-school"');
+    expect(html).toContain('Priya Sharma');
+    expect(html).toContain('Sports Day');
+    expect(html).not.toContain('<script>alert(1)</script>');
   });
 });

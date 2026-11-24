@@ -95,6 +95,12 @@ export function LoginPage() {
               {isSubmitting ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
+
+          <div className="text-center mt-3 pt-3 border-top">
+            <a href="/public/demo-school" className="small text-decoration-none">
+              Visit Public School Website
+            </a>
+          </div>
         </div>
       </div>
     </div>
