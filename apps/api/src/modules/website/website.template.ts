@@ -145,6 +145,11 @@ export function renderPublicSchoolSite(input: PublicSiteRenderInput): string {
       <div class="col-lg-4">
         <h6 class="d-flex align-items-center gap-2"><img src="/public/assets/images/logo.svg" width="30" height="30" alt=""> ${schoolName}</h6>
         <p class="small mb-2">${tagline}</p>
+        <div class="d-flex gap-3 mt-3">
+          <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" aria-label="Facebook"><i class="bi bi-facebook"></i></a>
+          <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" aria-label="Twitter"><i class="bi bi-twitter-x"></i></a>
+          <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><i class="bi bi-instagram"></i></a>
+        </div>
       </div>
       <div class="col-6 col-lg-2">
         <h6>Explore</h6>
@@ -175,7 +180,7 @@ export function renderPublicSchoolSite(input: PublicSiteRenderInput): string {
     </div>
     <div class="footer-bottom d-flex flex-wrap justify-content-between gap-2">
       <span>&copy; ${new Date().getUTCFullYear()} ${schoolName}. All rights reserved.</span>
-      <span>Powered by EduCore</span>
+      <span>Powered by Abdurrahman</span>
     </div>
   </div>
 </footer>`;
