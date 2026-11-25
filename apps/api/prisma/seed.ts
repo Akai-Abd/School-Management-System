@@ -250,7 +250,7 @@ export async function seedDemoShowcaseData() {
       principalMessage: `${school.name} provides a nurturing, technology-enabled learning environment for students from Class 6 to Class 10. Our experienced faculty, modern laboratories and student-centred approach help every learner reach their potential.`,
       address: '12 Knowledge Avenue, Kathmandu',
       contactPhone: '+977-1-5551234',
-      contactEmail: 'info@educore.com',
+      contactEmail: 'info@demo-school.edu',
       seoDescription: 'A modern school management system and public school website.',
     },
   });
@@ -442,7 +442,7 @@ export async function seedDemoShowcaseData() {
     });
   }
 
-  console.log(`Seeded EduCore showcase content for school (${school.slug}).`);
+  console.log(`Seeded showcase content for school (${school.slug}).`);
 }
 
 async function main() {

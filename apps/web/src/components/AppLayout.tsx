@@ -8,27 +8,67 @@ interface NavItem {
   icon: string;
   permission?: string;
   moduleKey?: string;
+  saasAdminOnly?: boolean;
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard', to: '/', icon: 'bi-speedometer2' },
-  { label: 'Academic', to: '/academic', icon: 'bi-diagram-3', permission: 'academic.view', moduleKey: 'academic' },
-  { label: 'Students', to: '/students', icon: 'bi-people', permission: 'students.view', moduleKey: 'students' },
-  { label: 'Staff', to: '/staff', icon: 'bi-person-badge', permission: 'staff.view', moduleKey: 'staff' },
-  { label: 'Attendance', to: '/attendance', icon: 'bi-calendar-check', permission: 'attendance.view', moduleKey: 'attendance' },
-  { label: 'Timetable', to: '/timetable', icon: 'bi-table', permission: 'timetable.view', moduleKey: 'timetable' },
-  { label: 'Examinations', to: '/exams', icon: 'bi-journal-check', permission: 'exams.view', moduleKey: 'exams' },
-  { label: 'Online Exams', to: '/online-exams', icon: 'bi-laptop', permission: 'exams.view', moduleKey: 'online_exams' },
-  { label: 'Homework', to: '/homework', icon: 'bi-book', permission: 'homework.view', moduleKey: 'homework' },
-  { label: 'Fees & Billing', to: '/fees', icon: 'bi-receipt', permission: 'fees.view', moduleKey: 'fees' },
-  { label: 'Accounting', to: '/accounting', icon: 'bi-journal-richtext', permission: 'accounting.view', moduleKey: 'accounting' },
-  { label: 'Library', to: '/library', icon: 'bi-bookshelf', permission: 'library.view', moduleKey: 'library' },
-  { label: 'Transport', to: '/transport', icon: 'bi-bus-front', permission: 'transport.view', moduleKey: 'transport' },
-  { label: 'Hostel', to: '/hostel', icon: 'bi-building', permission: 'hostel.view', moduleKey: 'hostel' },
-  { label: 'Website', to: '/website', icon: 'bi-globe', permission: 'website.view', moduleKey: 'website' },
-  { label: 'Notifications', to: '/notifications', icon: 'bi-bell', moduleKey: 'communications' },
-  { label: 'Settings', to: '/settings', icon: 'bi-gear', permission: 'schools.view' },
+interface NavGroup {
+  section: string;
+  items: NavItem[];
+}
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    section: 'Overview',
+    items: [{ label: 'Dashboard', to: '/', icon: 'bi-speedometer2' }],
+  },
+  {
+    section: 'Academics',
+    items: [
+      { label: 'Academic Sessions', to: '/academic', icon: 'bi-calendar3', permission: 'academic.view', moduleKey: 'academic' },
+      { label: 'Students', to: '/students', icon: 'bi-people', permission: 'students.view', moduleKey: 'students' },
+      { label: 'Attendance', to: '/attendance', icon: 'bi-calendar-check', permission: 'attendance.view', moduleKey: 'attendance' },
+      { label: 'Timetable', to: '/timetable', icon: 'bi-table', permission: 'timetable.view', moduleKey: 'timetable' },
+      { label: 'Examinations', to: '/exams', icon: 'bi-journal-check', permission: 'exams.view', moduleKey: 'exams' },
+      { label: 'Online Exams', to: '/online-exams', icon: 'bi-laptop', permission: 'exams.view', moduleKey: 'online_exams' },
+      { label: 'Homework', to: '/homework', icon: 'bi-book', permission: 'homework.view', moduleKey: 'homework' },
+    ],
+  },
+  {
+    section: 'Campus',
+    items: [
+      { label: 'Library', to: '/library', icon: 'bi-bookshelf', permission: 'library.view', moduleKey: 'library' },
+      { label: 'Transport', to: '/transport', icon: 'bi-bus-front', permission: 'transport.view', moduleKey: 'transport' },
+      { label: 'Hostel', to: '/hostel', icon: 'bi-building', permission: 'hostel.view', moduleKey: 'hostel' },
+    ],
+  },
+  {
+    section: 'Finance & HR',
+    items: [
+      { label: 'Fees & Billing', to: '/fees', icon: 'bi-receipt', permission: 'fees.view', moduleKey: 'fees' },
+      { label: 'Accounting', to: '/accounting', icon: 'bi-journal-richtext', permission: 'accounting.view', moduleKey: 'accounting' },
+      { label: 'Staff Records', to: '/staff', icon: 'bi-person-badge', permission: 'staff.view', moduleKey: 'staff' },
+    ],
+  },
+  {
+    section: 'Configuration',
+    items: [
+      { label: 'School Settings', to: '/settings', icon: 'bi-gear', permission: 'schools.view' },
+      { label: 'Website Manager', to: '/website', icon: 'bi-globe', permission: 'website.view', moduleKey: 'website' },
+      { label: 'Notifications', to: '/notifications', icon: 'bi-bell', moduleKey: 'communications' },
+    ],
+  },
+  {
+    section: 'System',
+    items: [
+      { label: 'Schools', to: '/platform', icon: 'bi-buildings', saasAdminOnly: true },
+      { label: 'Users & Admins', to: '/settings?tab=users', icon: 'bi-people-fill', permission: 'users.view' },
+      { label: 'Roles & Permissions', to: '/settings?tab=roles', icon: 'bi-shield-check', permission: 'roles.view' },
+      { label: 'Audit Logs', to: '/settings?tab=audit', icon: 'bi-clipboard-check', permission: 'audit_logs.view' },
+    ],
+  },
 ];
+
+const SYSTEM_SETTINGS_TABS = new Set(['users', 'roles', 'audit']);
 
 export function AppLayout() {
   const { session, activeMembership, logout, switchSchool, hasPermission, isModuleEnabled } = useAuth();
@@ -36,16 +76,25 @@ export function AppLayout() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const visibleNav = NAV_ITEMS.filter(
-    (item) =>
-      (!item.permission || hasPermission(item.permission)) &&
-      (!item.moduleKey || isModuleEnabled(item.moduleKey)),
-  );
-  if (session?.appMode === 'saas' && session.user.isPlatformAdmin) {
-    visibleNav.push({ label: 'Platform', to: '/platform', icon: 'bi-buildings' });
-  }
+  const isSaasAdmin = session?.appMode === 'saas' && session.user.isPlatformAdmin;
+  const visibleGroups = NAV_GROUPS.map((group) => ({
+    section: group.section,
+    items: group.items.filter(
+      (item) =>
+        (!item.saasAdminOnly || isSaasAdmin) &&
+        (!item.permission || hasPermission(item.permission)) &&
+        (!item.moduleKey || isModuleEnabled(item.moduleKey)),
+    ),
+  })).filter((group) => group.items.length > 0);
 
-  const currentItem = visibleNav.find((item) => item.to === location.pathname);
+  const searchTab = new URLSearchParams(location.search).get('tab');
+  const effectiveKey =
+    location.pathname === '/settings' && searchTab && SYSTEM_SETTINGS_TABS.has(searchTab)
+      ? `/settings?tab=${searchTab}`
+      : location.pathname;
+
+  const allItems = visibleGroups.flatMap((g) => g.items);
+  const currentItem = allItems.find((item) => item.to === effectiveKey);
   const pageTitle = currentItem?.label ?? 'Dashboard';
   const publicUrl = activeMembership ? `/public/${activeMembership.schoolSlug}` : '/public/demo-school';
   const initials = (session?.user.fullName ?? 'U')
@@ -70,30 +119,31 @@ export function AppLayout() {
 
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`} aria-label="Sidebar navigation">
         <div className="sidebar-brand">
-          <img src="/assets/images/logo.svg" alt="EduCore" />
+          <img src="/assets/images/logo.svg" alt="EduNexa" />
           <div>
-            <div className="brand-name">EduCore</div>
+            <div className="brand-name">EduNexa</div>
             <div className="brand-sub">{activeMembership?.schoolName ?? 'School ERP'}</div>
           </div>
         </div>
 
         <div className="sidebar-scroll">
-          <div className="sidebar-section">Navigation</div>
           <nav className="sidebar-nav" aria-label="Primary navigation">
-            {visibleNav.map((item) => {
-              const isActive = location.pathname === item.to;
-              return (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  className={isActive ? 'active' : undefined}
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <i className={`bi ${item.icon}`} aria-hidden="true" />
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
+            {visibleGroups.map((group) => (
+              <div key={group.section}>
+                <div className="sidebar-section">{group.section}</div>
+                {group.items.map((item) => (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    className={effectiveKey === item.to ? 'active' : undefined}
+                    onClick={() => setSidebarOpen(false)}
+                  >
+                    <i className={`bi ${item.icon}`} aria-hidden="true" />
+                    <span>{item.label}</span>
+                  </Link>
+                ))}
+              </div>
+            ))}
           </nav>
         </div>
 
@@ -166,7 +216,7 @@ export function AppLayout() {
         </main>
 
         <footer className="page-footer d-flex justify-content-between align-items-center">
-          <span>&copy; {new Date().getFullYear()} EduCore School Management System</span>
+          <span>&copy; {new Date().getFullYear()} EduNexa School Management System</span>
           <span>{activeMembership?.schoolName ?? 'Standalone'}</span>
         </footer>
       </div>

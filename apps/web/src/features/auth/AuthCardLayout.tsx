@@ -12,8 +12,8 @@ export function AuthCardLayout({ title, subtitle, narrow = false, children }: Au
     <div className="auth-body">
       <div className={`auth-card${narrow ? ' auth-narrow' : ''}`}>
         <div className="auth-brand">
-          <img src="/assets/images/logo.svg" alt="EduCore logo" />
-          <div className="auth-name">EduCore</div>
+          <img src="/assets/images/logo.svg" alt="EduNexa logo" />
+          <div className="auth-name">EduNexa</div>
           <div className="auth-tag">Complete School Management System</div>
         </div>
 

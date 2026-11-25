@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { apiFetch, ApiClientError } from '../../api/client';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import { useAuth } from '../../context/AuthContext';
@@ -48,11 +49,15 @@ interface AuditResponse {
 }
 
 type TabKey = 'general' | 'modules' | 'sequences' | 'roles' | 'users' | 'audit';
+const VALID_TABS = new Set<TabKey>(['general', 'modules', 'sequences', 'roles', 'users', 'audit']);
 
 export function SettingsPage() {
   const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<TabKey>('general');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawTab = searchParams.get('tab');
+  const tab: TabKey = rawTab && VALID_TABS.has(rawTab as TabKey) ? (rawTab as TabKey) : 'general';
+  const setTab = (next: TabKey) => setSearchParams(next === 'general' ? {} : { tab: next });
   const [notice, setNotice] = useState<string | null>(null);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRoleId, setInviteRoleId] = useState('');

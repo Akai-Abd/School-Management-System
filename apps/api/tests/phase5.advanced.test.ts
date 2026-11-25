@@ -46,7 +46,7 @@ describe('Phase 5 online exams, SSR website, and role dashboards', () => {
     expect((await request(app).get('/api/v1/dashboards/summary')).status).toBe(401);
   });
 
-  it('should render EduCore-style public SSR landing page with SEO tags and escaped content (M17-AC5/AC6)', () => {
+  it('should render modern public SSR landing page with SEO tags and escaped content (M17-AC5/AC6)', () => {
     const html = renderPublicSchoolSite({
       school: { name: 'Demo <High> School', slug: 'demo-school' },
       pageSlug: 'home',
@@ -68,7 +68,7 @@ describe('Phase 5 online exams, SSR website, and role dashboards', () => {
 
   it('should render public admissions page form and escape error alerts', () => {
     const html = renderPublicSchoolSite({
-      school: { name: 'EduCore Demo', slug: 'demo-school' },
+      school: { name: 'Demo High School', slug: 'demo-school' },
       pageSlug: 'admissions',
       stats: { students: 8, teachers: 3, classes: 6, books: 4 },
       teachers: [],
@@ -87,12 +87,12 @@ describe('Phase 5 online exams, SSR website, and role dashboards', () => {
 
   it('should render public contact page form and school contact cards', () => {
     const html = renderPublicSchoolSite({
-      school: { name: 'EduCore Demo', slug: 'demo-school' },
+      school: { name: 'Demo High School', slug: 'demo-school' },
       pageSlug: 'contact',
       settings: {
         tagline: null,
         principalMessage: null,
-        contactEmail: 'info@educore.com',
+        contactEmail: 'info@demo-school.edu',
         contactPhone: '+977-1-5551234',
         address: '12 Knowledge Avenue',
         seoDescription: null,
@@ -115,7 +115,7 @@ describe('Phase 5 online exams, SSR website, and role dashboards', () => {
 
   it('should render classes, news & notices, and detailed teacher cards', () => {
     const classesHtml = renderPublicSchoolSite({
-      school: { name: 'EduCore Demo', slug: 'demo-school' },
+      school: { name: 'Demo High School', slug: 'demo-school' },
       pageSlug: 'classes',
       stats: { students: 8, teachers: 3, classes: 1, books: 4 },
       teachers: [],
@@ -129,7 +129,7 @@ describe('Phase 5 online exams, SSR website, and role dashboards', () => {
     expect(classesHtml).toContain('Mathematics');
 
     const newsHtml = renderPublicSchoolSite({
-      school: { name: 'EduCore Demo', slug: 'demo-school' },
+      school: { name: 'Demo High School', slug: 'demo-school' },
       pageSlug: 'news',
       stats: { students: 8, teachers: 3, classes: 1, books: 4 },
       teachers: [],
@@ -142,7 +142,7 @@ describe('Phase 5 online exams, SSR website, and role dashboards', () => {
     expect(newsHtml).toContain('Staff Workshop');
 
     const teachersHtml = renderPublicSchoolSite({
-      school: { name: 'EduCore Demo', slug: 'demo-school' },
+      school: { name: 'Demo High School', slug: 'demo-school' },
       pageSlug: 'teachers',
       stats: { students: 8, teachers: 3, classes: 1, books: 4 },
       teachers: [{ fullName: 'David Miller', designation: 'Senior Teacher', specialization: 'Science', qualifications: 'M.Sc. Physics', experienceYears: 8 }],

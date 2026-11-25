@@ -313,7 +313,7 @@ export function renderPublicSchoolSite(input: PublicSiteRenderInput): string {
 <section class="public-section bg-white">
   <div class="container">
     <div class="text-center mb-5">
-      <div class="section-eyebrow">Why EduCore</div>
+      <div class="section-eyebrow">Why EduNexa</div>
       <h2 class="section-heading">Everything a modern school needs</h2>
     </div>
     <div class="row g-4">
@@ -537,7 +537,7 @@ export function renderPublicSchoolSite(input: PublicSiteRenderInput): string {
   <link rel="canonical" href="${canonical}" />
   <link rel="stylesheet" href="/public/assets/css/bootstrap.min.css" />
   <link rel="stylesheet" href="/public/assets/css/bootstrap-icons.css" />
-  <link rel="stylesheet" href="/public/assets/css/educore.css" />
+  <link rel="stylesheet" href="/public/assets/css/theme.css" />
 </head>
 <body>
 ${navbar}
