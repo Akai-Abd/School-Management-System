@@ -1,11 +1,28 @@
 import request from 'supertest';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
+import { prisma } from '../src/lib/prisma.js';
 import { autoGradeObjectiveAnswer, isAttemptExpired } from '../src/modules/onlineExams/onlineExams.routes.js';
 import { sanitizeRichHtml } from '../src/modules/website/website.routes.js';
 import { renderPublicSchoolSite } from '../src/modules/website/website.template.js';
 
+let dbReady = false;
+
 describe('Phase 5 online exams, SSR website, and role dashboards', () => {
+  beforeAll(async () => {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      dbReady = true;
+    } catch {
+      dbReady = false;
+    }
+  });
+
+  afterAll(async () => {
+    if (dbReady) {
+      await prisma.$disconnect();
+    }
+  });
   it('should enforce server-side online exam expiry and objective auto-grading (M08-AC2/AC4)', () => {
     const now = new Date('2026-11-25T10:00:00Z');
     expect(isAttemptExpired(new Date('2026-11-25T10:05:00Z'), now)).toBe(false);
@@ -165,6 +182,15 @@ describe('Phase 5 online exams, SSR website, and role dashboards', () => {
       .type('form')
       .send({ name: 'Test', email: 'a@b.com', message: 'Hello' });
     expect(evilPost.status).toBe(403);
+
+    const evilAdmission = await request(app)
+      .post('/public/demo-school/admissions/apply')
+      .set('Origin', 'https://evil.example')
+      .type('form')
+      .send({ studentName: 'Test' });
+    expect(evilAdmission.status).toBe(403);
+
+    if (!dbReady) return;
 
     const res = await request(app).get('/public/demo-school/admissions?error=Phishing+link');
     if (res.status === 200) {
