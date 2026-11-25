@@ -43,12 +43,12 @@ export const evaluateAnswerSchema = z.object({
 });
 
 export const upsertWebsiteSettingSchema = z.object({
-  tagline: z.string().trim().max(200).optional(),
-  principalMessage: z.string().trim().max(4000).optional(),
-  contactEmail: z.string().trim().email().optional(),
-  contactPhone: z.string().trim().max(30).optional(),
-  address: z.string().trim().max(300).optional(),
-  seoDescription: z.string().trim().max(300).optional(),
+  tagline: z.string().trim().max(200).nullable().optional(),
+  principalMessage: z.string().trim().max(4000).nullable().optional(),
+  contactEmail: z.string().trim().email().nullable().optional(),
+  contactPhone: z.string().trim().max(30).nullable().optional(),
+  address: z.string().trim().max(300).nullable().optional(),
+  seoDescription: z.string().trim().max(300).nullable().optional(),
 });
 
 export const upsertWebsitePageSchema = z.object({

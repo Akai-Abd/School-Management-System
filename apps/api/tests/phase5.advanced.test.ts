@@ -22,12 +22,15 @@ describe('Phase 5 online exams, SSR website, and role dashboards', () => {
   });
 
   it('should sanitize website rich HTML against XSS payloads (M17-AC6)', () => {
-    const dirty = '<p onclick="alert(1)">Hello</p><script>steal()</script><a href="javascript:alert(2)">Link</a>';
+    const dirty =
+      '<p onclick="alert(1)">Hello</p><svg/onload=alert(1)><script>steal()</script><script src=//evil.com><a href="javascript:alert(2)">Link</a><a href="data:text/html,<svg/onload=1>">Bad</a>';
     const clean = sanitizeRichHtml(dirty);
     expect(clean).not.toContain('<script');
     expect(clean).not.toContain('onclick');
+    expect(clean).not.toContain('onload');
     expect(clean).not.toContain('javascript:');
-    expect(clean).toContain('<p>Hello</p>');
+    expect(clean).not.toContain('data:text/html');
+    expect(clean).toContain('<p >Hello</p>');
   });
 
   it('should expose Phase 5 OpenAPI routes and enforce auth', async () => {
@@ -152,5 +155,22 @@ describe('Phase 5 online exams, SSR website, and role dashboards', () => {
     expect(teachersHtml).toContain('Senior Teacher');
     expect(teachersHtml).toContain('M.Sc. Physics');
     expect(teachersHtml).toContain('8 years experience');
+  });
+
+  it('should reject cross-origin public form submissions and ignore arbitrary query error text', async () => {
+    const app = createApp();
+    const evilPost = await request(app)
+      .post('/public/demo-school/contact/submit')
+      .set('Origin', 'https://evil.example')
+      .type('form')
+      .send({ name: 'Test', email: 'a@b.com', message: 'Hello' });
+    expect(evilPost.status).toBe(403);
+
+    const res = await request(app).get('/public/demo-school/admissions?error=Phishing+link');
+    if (res.status === 200) {
+      expect(res.text).not.toContain('Phishing link');
+    } else {
+      expect(res.status).toBe(404);
+    }
   });
 });

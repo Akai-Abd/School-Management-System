@@ -110,17 +110,17 @@ export function WebsitePage() {
       <form className="card border-0 shadow-sm p-3" onSubmit={(e) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
-        const opt = (k: string) => {
+        const nullable = (k: string) => {
           const val = String(fd.get(k) ?? '').trim();
-          return val ? val : undefined;
+          return val ? val : null;
         };
         saveSettings.mutate({
-          tagline: opt('tagline'),
-          principalMessage: opt('principalMessage'),
-          contactEmail: opt('contactEmail'),
-          contactPhone: opt('contactPhone'),
-          address: opt('address'),
-          seoDescription: opt('seoDescription'),
+          tagline: nullable('tagline'),
+          principalMessage: nullable('principalMessage'),
+          contactEmail: nullable('contactEmail'),
+          contactPhone: nullable('contactPhone'),
+          address: nullable('address'),
+          seoDescription: nullable('seoDescription'),
         });
       }}>
         <h2 className="h6 mb-2">Landing Hero &amp; Contact Settings</h2>

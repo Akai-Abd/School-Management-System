@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import argon2 from 'argon2';
 import { PrismaClient } from '@prisma/client';
 import { CONFIGURABLE_MODULE_KEYS, PERMISSION_ACTIONS, SYSTEM_ROLE_KEYS } from '@school-erp/contracts';
+import { nextDocumentNumber } from '../src/lib/prisma.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
@@ -322,15 +323,16 @@ export async function seedDemoShowcaseData() {
     const teacherDesig = await ensureDesignation('Teacher');
 
     const teachers = [
-      { code: 'EMP-101', name: 'David Miller', designationId: seniorDesig.id, spec: 'Science', qual: 'M.Sc. Physics', exp: 8 },
-      { code: 'EMP-102', name: 'John Carter', designationId: teacherDesig.id, spec: 'English', qual: 'M.A. English', exp: 5 },
-      { code: 'EMP-103', name: 'Priya Sharma', designationId: teacherDesig.id, spec: 'Mathematics', qual: 'M.Sc. Mathematics', exp: 6 },
+      { name: 'David Miller', designationId: seniorDesig.id, spec: 'Science', qual: 'M.Sc. Physics', exp: 8 },
+      { name: 'John Carter', designationId: teacherDesig.id, spec: 'English', qual: 'M.A. English', exp: 5 },
+      { name: 'Priya Sharma', designationId: teacherDesig.id, spec: 'Mathematics', qual: 'M.Sc. Mathematics', exp: 6 },
     ];
     for (const t of teachers) {
+      const employeeCode = await prisma.$transaction((tx) => nextDocumentNumber(tx, school.id, 'employee'));
       const staff = await prisma.staff.create({
         data: {
           schoolId: school.id,
-          employeeCode: t.code,
+          employeeCode,
           fullName: t.name,
           designationId: t.designationId,
           joiningDate: new Date('2022-04-01T00:00:00.000Z'),
@@ -404,10 +406,11 @@ export async function seedDemoShowcaseData() {
       if (c.students && (await prisma.student.count({ where: { schoolId: school.id } })) < 8) {
         for (let idx = 0; idx < c.students; idx++) {
           const num = admSeq++;
+          const admissionNumber = await prisma.$transaction((tx) => nextDocumentNumber(tx, school.id, 'admission'));
           const st = await prisma.student.create({
             data: {
               schoolId: school.id,
-              admissionNumber: `ADM-${String(num).padStart(4, '0')}`,
+              admissionNumber,
               firstName: 'Student',
               lastName: String(num),
               dateOfBirth: new Date('2011-05-15T00:00:00.000Z'),

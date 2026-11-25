@@ -1,5 +1,6 @@
-import express, { Router } from 'express';
+import express, { Router, type Request } from 'express';
 import rateLimit from 'express-rate-limit';
+import { z } from 'zod';
 import {
   createAdmissionApplicationSchema,
   createContactInquirySchema,
@@ -19,6 +20,13 @@ import { escapeHtml, renderPublicSchoolSite, sanitizeRichHtml } from './website.
 
 export { escapeHtml, sanitizeRichHtml };
 
+const uuidParamSchema = z.string().uuid();
+
+const PUBLIC_FORM_ERRORS: Record<string, string> = {
+  invalid_fields: 'Please check the required fields and try again.',
+  invalid_class: 'Selected class is not available for this school.',
+};
+
 const BUILTIN_PUBLIC_SLUGS = new Set([
   'home',
   'about',
@@ -31,6 +39,15 @@ const BUILTIN_PUBLIC_SLUGS = new Set([
   'gallery',
   'contact',
 ]);
+
+function assertSameOriginIfPresent(req: Request) {
+  const origin = req.header('origin');
+  if (!origin) return;
+  const hostOrigin = `${req.protocol}://${req.get('host')}`;
+  if (origin !== env.APP_ORIGIN && origin !== hostOrigin) {
+    throw Errors.forbidden('Invalid request origin');
+  }
+}
 
 export const websiteAdminRouter = Router();
 websiteAdminRouter.use(requireAuth, requireSchoolContext, requireModule('website'));
@@ -139,7 +156,10 @@ websiteAdminRouter.post('/events', requireCsrf, requirePermission('website.creat
 
 websiteAdminRouter.patch('/admissions/:id', requireCsrf, requirePermission('website.update'), validateBody(updateAdmissionStatusSchema), async (req, res, next) => {
   try {
-    const existing = await req.tenantPrisma!.admissionApplication.findFirst({ where: { id: req.params.id } });
+    const idParsed = uuidParamSchema.safeParse(req.params.id);
+    if (!idParsed.success) throw Errors.badRequest('Invalid application ID');
+
+    const existing = await req.tenantPrisma!.admissionApplication.findFirst({ where: { id: idParsed.data } });
     if (!existing) throw Errors.notFound('Admission application not found');
     const updated = await req.tenantPrisma!.admissionApplication.update({
       where: { id: existing.id },
@@ -153,7 +173,10 @@ websiteAdminRouter.patch('/admissions/:id', requireCsrf, requirePermission('webs
 
 websiteAdminRouter.patch('/inquiries/:id', requireCsrf, requirePermission('website.update'), validateBody(updateInquiryStatusSchema), async (req, res, next) => {
   try {
-    const existing = await req.tenantPrisma!.contactInquiry.findFirst({ where: { id: req.params.id } });
+    const idParsed = uuidParamSchema.safeParse(req.params.id);
+    if (!idParsed.success) throw Errors.badRequest('Invalid inquiry ID');
+
+    const existing = await req.tenantPrisma!.contactInquiry.findFirst({ where: { id: idParsed.data } });
     if (!existing) throw Errors.notFound('Contact inquiry not found');
     const updated = await req.tenantPrisma!.contactInquiry.update({
       where: { id: existing.id },
@@ -168,30 +191,35 @@ websiteAdminRouter.patch('/inquiries/:id', requireCsrf, requirePermission('websi
 /** Unauthenticated server-rendered public school website (M17-AC2..AC6). */
 export const publicWebsiteRouter = Router();
 
-const admissionsRateLimiter = rateLimit({
+const publicFormRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: env.NODE_ENV === 'test' ? 1000 : 15,
   standardHeaders: true,
   legacyHeaders: false,
 });
 
+async function requireActivePublicSchool(slug: string) {
+  const school = await prisma.school.findFirst({
+    where: { slug, status: 'active', deletedAt: null },
+    select: { id: true, slug: true },
+  });
+  if (!school) throw Errors.notFound('School website not found');
+  return school;
+}
+
 publicWebsiteRouter.post(
   '/:schoolSlug/admissions/apply',
-  admissionsRateLimiter,
+  publicFormRateLimiter,
   express.urlencoded({ extended: false, limit: '32kb' }),
   async (req, res, next) => {
     try {
-      const school = await prisma.school.findFirst({
-        where: { slug: req.params.schoolSlug, status: 'active', deletedAt: null },
-        select: { id: true, slug: true },
-      });
-      if (!school) throw Errors.notFound('School website not found');
-
+      assertSameOriginIfPresent(req);
+      const school = await requireActivePublicSchool(req.params.schoolSlug!);
       const baseAdmissions = `/public/${encodeURIComponent(school.slug)}/admissions`;
+
       const parsed = createAdmissionApplicationSchema.safeParse(req.body);
       if (!parsed.success) {
-        const msg = parsed.error.issues[0]?.message ?? 'Please check the required fields.';
-        return res.redirect(303, `${baseAdmissions}?error=${encodeURIComponent(msg)}`);
+        return res.redirect(303, `${baseAdmissions}?code=invalid_fields`);
       }
 
       const data = parsed.data;
@@ -202,7 +230,7 @@ publicWebsiteRouter.post(
           select: { id: true },
         });
         if (!cls) {
-          return res.redirect(303, `${baseAdmissions}?error=${encodeURIComponent('Selected class is invalid.')}`);
+          return res.redirect(303, `${baseAdmissions}?code=invalid_class`);
         }
         validClassId = cls.id;
       }
@@ -232,21 +260,17 @@ publicWebsiteRouter.post(
 
 publicWebsiteRouter.post(
   '/:schoolSlug/contact/submit',
-  admissionsRateLimiter,
+  publicFormRateLimiter,
   express.urlencoded({ extended: false, limit: '32kb' }),
   async (req, res, next) => {
     try {
-      const school = await prisma.school.findFirst({
-        where: { slug: req.params.schoolSlug, status: 'active', deletedAt: null },
-        select: { id: true, slug: true },
-      });
-      if (!school) throw Errors.notFound('School website not found');
-
+      assertSameOriginIfPresent(req);
+      const school = await requireActivePublicSchool(req.params.schoolSlug!);
       const baseContact = `/public/${encodeURIComponent(school.slug)}/contact`;
+
       const parsed = createContactInquirySchema.safeParse(req.body);
       if (!parsed.success) {
-        const msg = parsed.error.issues[0]?.message ?? 'Please fill in all required fields.';
-        return res.redirect(303, `${baseContact}?error=${encodeURIComponent(msg)}`);
+        return res.redirect(303, `${baseContact}?code=invalid_fields`);
       }
 
       const data = parsed.data;
@@ -283,6 +307,13 @@ publicWebsiteRouter.get('/', async (_req, res, next) => {
 
 publicWebsiteRouter.get('/:schoolSlug/:pageSlug?', async (req, res, next) => {
   try {
+    const pageSlug = req.params.pageSlug ?? 'home';
+    const needsNews = pageSlug === 'home' || pageSlug === 'news';
+    const needsEvents = pageSlug === 'home' || pageSlug === 'events';
+    const needsStats = pageSlug === 'home';
+    const needsTeachers = pageSlug === 'home' || pageSlug === 'teachers';
+    const needsClasses = pageSlug === 'classes' || pageSlug === 'academics' || pageSlug === 'admissions';
+
     const school = await prisma.school.findFirst({
       where: { slug: req.params.schoolSlug, status: 'active', deletedAt: null },
       select: {
@@ -290,60 +321,86 @@ publicWebsiteRouter.get('/:schoolSlug/:pageSlug?', async (req, res, next) => {
         name: true,
         slug: true,
         websiteSetting: true,
-        websiteAnnouncements: {
-          where: { isPublished: true },
-          select: { title: true, body: true, createdAt: true },
-          orderBy: { createdAt: 'desc' },
-          take: 15,
-        },
-        websiteEvents: {
-          where: { isPublished: true },
-          select: { title: true, eventDate: true, description: true },
-          orderBy: { eventDate: 'asc' },
-          take: 5,
-        },
+        websiteAnnouncements: needsNews
+          ? {
+              where: { isPublished: true },
+              select: { title: true, body: true, createdAt: true },
+              orderBy: { createdAt: 'desc' },
+              take: pageSlug === 'news' ? 15 : 5,
+            }
+          : false,
+        websiteEvents: needsEvents
+          ? {
+              where: { isPublished: true },
+              select: { title: true, eventDate: true, description: true },
+              orderBy: { eventDate: 'asc' },
+              take: pageSlug === 'events' ? 15 : 5,
+            }
+          : false,
       },
     });
     if (!school) throw Errors.notFound('School website not found');
 
-    const pageSlug = req.params.pageSlug ?? 'home';
     const [page, studentsCount, teachersCount, classesCount, booksCount, teacherRows, classRows] = await Promise.all([
       prisma.websitePage.findFirst({
         where: { schoolId: school.id, slug: pageSlug, status: 'published' },
         select: { title: true, contentHtml: true, seoTitle: true, seoDescription: true },
       }),
-      prisma.student.count({ where: { schoolId: school.id, status: 'active', deletedAt: null } }),
-      prisma.staff.count({ where: { schoolId: school.id, isTeacher: true, status: 'active', deletedAt: null } }),
-      prisma.schoolClass.count({ where: { schoolId: school.id, deletedAt: null } }),
-      prisma.book.count({ where: { schoolId: school.id } }),
-      prisma.staff.findMany({
-        where: { schoolId: school.id, isTeacher: true, status: 'active', deletedAt: null },
-        select: {
-          fullName: true,
-          designation: { select: { name: true } },
-          teacherProfile: { select: { specialization: true, qualifications: true, experienceYears: true } },
-        },
-        orderBy: { fullName: 'asc' },
-        take: 24,
-      }),
-      prisma.schoolClass.findMany({
-        where: { schoolId: school.id, deletedAt: null },
-        select: {
-          id: true,
-          name: true,
-          code: true,
-          sections: { where: { deletedAt: null }, select: { name: true }, orderBy: { name: 'asc' } },
-          classSubjects: { select: { subject: { select: { name: true } } } },
-          _count: { select: { enrollments: { where: { status: 'active' } } } },
-        },
-        orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }],
-        take: 24,
-      }),
+      needsStats ? prisma.student.count({ where: { schoolId: school.id, status: 'active', deletedAt: null } }) : 0,
+      needsStats ? prisma.staff.count({ where: { schoolId: school.id, isTeacher: true, status: 'active', deletedAt: null } }) : 0,
+      needsStats ? prisma.schoolClass.count({ where: { schoolId: school.id, deletedAt: null } }) : 0,
+      needsStats ? prisma.book.count({ where: { schoolId: school.id } }) : 0,
+      needsTeachers
+        ? prisma.staff.findMany({
+            where: { schoolId: school.id, isTeacher: true, status: 'active', deletedAt: null },
+            select: {
+              fullName: true,
+              designation: { select: { name: true } },
+              teacherProfile: { select: { specialization: true, qualifications: true, experienceYears: true } },
+            },
+            orderBy: { fullName: 'asc' },
+            take: pageSlug === 'teachers' ? 24 : 4,
+          })
+        : [],
+      needsClasses
+        ? pageSlug === 'classes'
+          ? prisma.schoolClass.findMany({
+              where: { schoolId: school.id, deletedAt: null },
+              select: {
+                id: true,
+                name: true,
+                code: true,
+                sections: { where: { deletedAt: null }, select: { name: true }, orderBy: { name: 'asc' } },
+                classSubjects: { where: { subject: { deletedAt: null } }, select: { subject: { select: { name: true } } } },
+                _count: { select: { enrollments: { where: { status: 'active' } } } },
+              },
+              orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }],
+              take: 24,
+            }).then((rows) =>
+              rows.map((c) => ({
+                id: c.id,
+                name: c.name,
+                code: c.code,
+                studentCount: c._count.enrollments,
+                sections: c.sections.map((s) => s.name),
+                subjects: [...new Set(c.classSubjects.map((cs) => cs.subject.name))],
+              })),
+            )
+          : prisma.schoolClass.findMany({
+              where: { schoolId: school.id, deletedAt: null },
+              select: { id: true, name: true, code: true },
+              orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }],
+              take: 24,
+            })
+        : [],
     ]);
 
     if (req.params.pageSlug && !page && !BUILTIN_PUBLIC_SLUGS.has(pageSlug)) {
       throw Errors.notFound('Published page not found');
     }
+
+    const rawCode = typeof req.query.code === 'string' ? req.query.code : '';
+    const errorMsg = PUBLIC_FORM_ERRORS[rawCode] ?? null;
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(renderPublicSchoolSite({
@@ -364,21 +421,11 @@ publicWebsiteRouter.get('/:schoolSlug/:pageSlug?', async (req, res, next) => {
         qualifications: t.teacherProfile?.qualifications ?? null,
         experienceYears: t.teacherProfile?.experienceYears ?? null,
       })),
-      classes: classRows.map((c) => ({
-        id: c.id,
-        name: c.name,
-        code: c.code,
-        studentCount: c._count.enrollments,
-        sections: c.sections.map((s) => s.name),
-        subjects: [...new Set(c.classSubjects.map((cs) => cs.subject.name))],
-      })),
-      announcements: school.websiteAnnouncements,
-      events: school.websiteEvents,
+      classes: classRows,
+      announcements: Array.isArray(school.websiteAnnouncements) ? school.websiteAnnouncements : [],
+      events: Array.isArray(school.websiteEvents) ? school.websiteEvents : [],
       admissionFeedback: pageSlug === 'admissions' || pageSlug === 'contact'
-        ? {
-            submitted: req.query.submitted === '1',
-            error: typeof req.query.error === 'string' ? req.query.error.slice(0, 200) : null,
-          }
+        ? { submitted: req.query.submitted === '1', error: errorMsg }
         : undefined,
       loginUrl: '/login',
     }));

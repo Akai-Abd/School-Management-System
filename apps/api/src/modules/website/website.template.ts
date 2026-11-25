@@ -7,13 +7,13 @@ export function escapeHtml(input: string): string {
     .replace(/'/g, '&#39;');
 }
 
-/** Strips script/iframe tags, inline on* handlers, and javascript: URIs (M17-AC6). */
+/** Strips dangerous tags, inline on* handlers (including slash-separated), and unsafe URIs (M17-AC6). */
 export function sanitizeRichHtml(rawHtml: string): string {
   return rawHtml
-    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
-    .replace(/<iframe[\s\S]*?>[\s\S]*?<\/iframe>/gi, '')
-    .replace(/\son\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-    .replace(/javascript:/gi, 'blocked:');
+    .replace(/<(script|iframe|object|embed|style)\b[^>]*>[\s\S]*?<\/\1>/gi, '')
+    .replace(/<\/?(script|iframe|object|embed|style)\b[^>]*\/?>/gi, '')
+    .replace(/(?:^|[\s/])on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, ' ')
+    .replace(/(?:javascript|vbscript)\s*:|data\s*:\s*text\/html/gi, 'blocked:');
 }
 
 export interface PublicSiteRenderInput {
@@ -260,6 +260,9 @@ export function renderPublicSchoolSite(input: PublicSiteRenderInput): string {
 
   let mainContent = '';
   if (pageSlug === 'home') {
+    const customHomeSection = customPage
+      ? `\n<section class="public-section bg-white"><div class="container"><div class="feature-card">${sanitizeRichHtml(customPage.contentHtml)}</div></div></section>`
+      : '';
     mainContent = `
 <section class="hero">
   <div class="container position-relative">
@@ -360,7 +363,7 @@ export function renderPublicSchoolSite(input: PublicSiteRenderInput): string {
     <p class="text-white-50 mb-4">Admissions are open for the current academic session.</p>
     <a href="${base}/admissions" class="btn btn-light px-4"><i class="bi bi-pencil-square me-2"></i>Start your application</a>
   </div>
-</section>`;
+</section>${customHomeSection}`;
   } else {
     let subBody = '';
     if (customPage) {
