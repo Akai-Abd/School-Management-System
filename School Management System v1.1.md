@@ -1,10 +1,10 @@
-# School Management System (School ERP) — Product Requirements Document (PRD)
+# EduNexa — School Management System (School ERP) — Product Requirements Document (PRD)
 
-**Version:** 1.1  
-**Status:** Accepted — baseline for Phase 1+ implementation (open decisions in §19 closed; Phase 0 tech lock-ins aligned)  
+**Version:** 1.1 (Synced with Codebase)  
+**Status:** Implemented & Verified — Phases 0–7 + EduNexa Public Website & Admissions/Inquiries Portal implemented and tested; pilot school UAT, legal privacy sign-off, and optional UI/analytics enhancements (Recharts, `i18next`) remain pre-launch/deferred  
 **Date:** 25 November 2026  
 **Supersedes:** v1.0 (25 November 2026)  
-**Product Type:** Multi-Tenant School ERP + Standalone School Management Software
+**Product Type:** Multi-Tenant School ERP (`APP_MODE=saas`) + Standalone School Management Software (`APP_MODE=standalone`)
 
 ### Document conventions
 
@@ -88,8 +88,8 @@ A **Hostel Warden** is supported as a pre-seeded, configurable role template (se
 - Online payment gateway collection (parents view invoices and receipts; payments are recorded by staff using offline modes in v1).
 - Native mobile applications (the web application is responsive; web push may be offered).
 - Live GPS tracking, biometric/RFID integration, library barcode scanning.
-- Online admission applications, advanced exam proctoring, AI-assisted reporting.
-- Multi-language user interface (the UI MUST be built i18n-ready; only English ships).
+- Advanced exam proctoring, AI-assisted reporting (online admission applications & contact inquiries are **in scope and implemented** in `M17`).
+- Multi-language user interface (English ships in v1.1; external `i18next` wiring deferred).
 
 ### 1.5 Success Metrics (targets to validate with pilot schools)
 
@@ -213,17 +213,16 @@ Items marked **(confirm)** are recommended defaults that must be ratified in §1
 
 ### 3.1 Frontend
 
-- React
-- Vite
-- TypeScript
-- Bootstrap 5
-- React Router
-- TanStack Query for server-state management
-- React Hook Form
-- Zod for validation
-- Standardized Fetch API client wrapper (single client with error normalization, CSRF handling and retries)
-- Chart library for analytics: Recharts (decided in §19 D1)
-- i18n framework (for example `i18next`) wired from day one, with English as the only shipped language
+- React 18 (`^18.3.1`)
+- Vite 6 (`^6.1.1`)
+- TypeScript (`^5.7.3`)
+- Bootstrap 5 (`^5.3.3`) + `bootstrap-icons` (`^1.11.3`) with EduNexa grouped dark-sidebar navigation shell (`AppLayout`)
+- React Router (`^7.2.0`) with smart `/` root routing (unauthenticated visitors route to `/public`; authenticated users open the ERP Dashboard) and `/login`, `/forgot-password`, `/reset-password`
+- TanStack Query (`^5.66.9`) for server-state management
+- React Hook Form (`^7.54.2`) + `@hookform/resolvers`
+- Zod (`^3.24.2`) validation shared via `@school-erp/contracts`
+- Standardized Fetch API client wrapper (`apps/web/src/api/client.ts`) with error normalization and `X-CSRF-Token` injection
+- Analytics & i18n status: Recharts (`D1`) and `i18next` remain closed architectural selections not yet bundled in `apps/web/package.json`; current dashboards render Bootstrap 5 metric cards and English UI strings.
 
 Requirements:
 - Responsive interface.
@@ -239,28 +238,27 @@ Requirements:
 
 ### 3.2 Backend
 
-- Node.js
-- Express.js
-- TypeScript
-- Prisma ORM
-- PostgreSQL
-- Zod
-- Secure server-managed session authentication
-- Background job processing (see §3.3)
-- OpenAPI 3.1 documentation generated from the Zod schemas where practical
-- PDF & export generation: `pdfkit` for receipts, report cards, ID cards and certificates; `exceljs` for Excel/CSV exports (decided in §19 D3)
+- Node.js 22+
+- Express.js (`^4.21.2`)
+- TypeScript (`^5.7.3`)
+- Prisma ORM (`^6.4.1`)
+- PostgreSQL 16 (with `FORCE ROW LEVEL SECURITY` scoped by `app.current_school_id`)
+- Zod (`^3.24.2`) via `@school-erp/contracts`
+- Secure server-managed session authentication (`Argon2id` via `argon2`, HTTP-only `SameSite=Lax` cookies, CSRF header + `Origin` validation)
+- Background job processing (BullMQ + Redis 7)
+- OpenAPI 3.1 documentation generated from Zod schemas (`@asteasolutions/zod-to-openapi` + `swagger-ui-express` at `/docs` and `/openapi.json`)
+- PDF & export generation: `pdfkit` (`^0.21.0`) for receipts and report cards; `exceljs` (`^4.4.0`) for Excel/CSV exports (decided in §19 D3)
 
 ### 3.3 Infrastructure
 
-- Docker and Docker Compose.
-- Reverse proxy with HTTPS.
-- PostgreSQL database.
-- Background job queue: BullMQ + Redis 7 in both SaaS and Standalone Compose stacks (single queue code path implemented in Phase 0; §19 D2).
-- Local or cloud object storage.
-- Automated, encrypted database backups with documented restore procedure.
-- Centralized application logs.
-- Monitoring and error reporting.
-- Health check endpoints.
+- Docker and Docker Compose (`docker/docker-compose.yml`, `docker/docker-compose.prod.yml`) as well as supported native OS installations of PostgreSQL 16+ and Redis 7+.
+- Reverse proxy with HTTPS (production).
+- PostgreSQL 16 database.
+- Background job queue: BullMQ (`^5.41.5`) + Redis 7 (`ioredis`) in both SaaS and Standalone stacks (single queue code path implemented in Phase 0; §19 D2).
+- Local disk or S3-compatible object storage (`@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner`).
+- Automated, encrypted database backups with documented restore procedure + school JSON export (`/api/v1/settings/export.json`).
+- Structured logging (`pino` / `pino-http` with correlation request IDs).
+- Monitoring and health check endpoints (`/healthz`, `/readyz`).
 
 ### 3.4 Architecture Pattern
 
@@ -871,32 +869,25 @@ Acceptance criteria:
 - M16-AC5: Dashboard figures for a typical school load within the target in §10.
 
 ### M17 — Dynamic School Website
-**Phase:** 5 | **MVP:** No
+**Phase:** 5 (+ Phase 7 public admissions & inquiries) | **MVP:** No | **Status:** Implemented & Verified
 
 Features:
-- Home page.
-- About school.
-- Principal's message.
-- Academic information.
-- Admission information.
-- Faculty information (opt-in per staff member).
-- Photo galleries.
-- Announcements.
-- Events.
-- Contact page.
-- SEO metadata and social-sharing previews.
-- Navigation menu management.
-- Page publishing (draft, scheduled, published).
-- Rich-text content with server-side sanitization.
-- Custom domain support (SaaS: automated certificate provisioning).
+- Built-in server-rendered (SSR) public pages under `/public` and `/public/:schoolSlug/:pageSlug?`: Home (`home`), About (`about`), Academics (`academics`), Classes (`classes` — student/section counts & subjects), Our Teachers (`teachers` — designation, specialization, qualifications, experience; no private contact PII), Admissions (`admissions` — showcase + public application form), Events (`events`), News & Notices (`announcements`), Gallery (`gallery` — self-hosted SVGs under `/public/assets/`), and Contact Us (`contact` — public inquiry form).
+- Custom CMS pages (`website_pages`) with draft/published states, custom slugs, SEO metadata (`seo_title`, `seo_description`), and server-side HTML sanitization (`sanitizeRichHtml`).
+- Website settings (`website_settings`): tagline, Principal's message, contact email/phone, address, SEO description.
+- Announcements (`website_announcements`) and Events (`website_events`) publishing via `/website` CMS (`/api/v1/website`).
+- Online Admission Applications (`admission_applications` via `POST /public/:schoolSlug/admissions/apply`) and Contact Inquiries (`contact_inquiries` via `POST /public/:schoolSlug/contact/submit`) with rate limiting, same-origin checks, allowlisted validation/error codes, and admin status workflow (`pending|reviewed|accepted|rejected` and `new|resolved`) in `/website`.
+- Self-hosted static CSS, icons, and branding assets (`/public/assets/*`) compatible with strict Helmet CSP headers.
+- Future/deferred website extensions: database-driven custom menus (`website_menus`), uploaded photo gallery albums (`website_galleries`/`website_media`), and automated custom-domain TLS provisioning.
 
 Acceptance criteria:
-- M17-AC1: Schools can manage their own public website.
+- M17-AC1: Schools can manage their own public website, settings, announcements, events, custom pages, admission applications, and contact inquiries.
 - M17-AC2: Draft pages are not publicly visible.
-- M17-AC3: Published pages are accessible through school-specific URLs or configured domains.
-- M17-AC4: Public pages never expose private school records.
+- M17-AC3: Published pages are accessible through school-specific URLs (`/public/:schoolSlug/:pageSlug?`) or `/` when unauthenticated.
+- M17-AC4: Public pages never expose private school records or staff contact PII.
 - M17-AC5: Public pages are server-rendered with unique title, description and canonical metadata.
 - M17-AC6: User-supplied rich text is sanitized and cannot execute scripts.
+- M17-AC7: Public Admission Application and Contact Inquiry submissions enforce rate limiting, same-origin checks, and strict status/validation rules.
 
 ### M18 — Data Import, Export and Offboarding
 **Phase:** 1 (students, staff, guardians import), 3 (fee data), 6 (full export and offboarding) | **MVP:** Import of students, guardians and staff; basic exports
@@ -956,7 +947,7 @@ PostgreSQL with Prisma ORM.
 
 ### 6.3 Main Database Tables
 
-Tables marked † are new in v1.1.
+Tables marked † are new in v1.1. Where the implemented Prisma schema (`apps/api/prisma/schema.prisma`) consolidates or renames a planned v1.1 table, the active PostgreSQL table name is noted explicitly.
 
 #### Platform
 - users
@@ -964,14 +955,12 @@ Tables marked † are new in v1.1.
 - school_memberships
 - school_settings
 - school_subscriptions
-- subscription_plans
-- plan_features †
+- subscription_plans (includes `enabled_modules_json` + limits, consolidating planned `plan_features` †)
 - school_modules †
-- platform_admins †
 - support_access_grants †
-- school_domains †
-- school_integrations †
-- document_sequences (implemented Phase 0 table for numbering_sequences †)
+- platform_audit_logs † (with `users.is_platform_admin` / platform role checks in place of separate `platform_admins` †)
+- document_sequences (implemented table for planned `numbering_sequences` †)
+- *(Planned/deferred: `school_domains` †, `school_integrations` †)*
 
 #### Authentication and Permissions
 - roles
@@ -1126,11 +1115,11 @@ Tables marked † are new in v1.1.
 #### Website
 - website_settings
 - website_pages
-- website_menus
 - website_announcements
 - website_events †
-- website_galleries
-- website_media †
+- admission_applications † (public & CMS admission inquiry/application workflow, migration `0005`)
+- contact_inquiries † (public & CMS contact inquiries, migration `0006`)
+- *(Planned/deferred: `website_menus`, `website_galleries`, `website_media` † — current implementation uses built-in EduNexa public navigation and self-hosted showcase SVGs under `/public/assets/`)*
 
 ### 6.4 Tenant Isolation
 
@@ -1159,7 +1148,7 @@ A student can have different enrolments across academic years without overwritin
 - Financial records MUST NOT be physically deleted through normal application operations.
 - Financial corrections MUST create traceable adjustment or reversal records.
 - Every financial action appends to `financial_events`, which is the source for audit, reconciliation and later accounting back-fill.
-- Receipt, invoice and journal numbers come from `numbering_sequences` using row-level locking or an equivalent concurrency-safe method.
+- Receipt, invoice and journal numbers come from `document_sequences` using row-level locking or an equivalent concurrency-safe method.
 - Money is stored as `NUMERIC` in the school currency's minor-unit precision; rounding rules (for example per-line or per-invoice) are defined in school settings and tested.
 
 ---
@@ -1172,49 +1161,38 @@ Use REST APIs with JSON requests and responses. Breaking changes require a new v
 
 ### Main API Groups
 
-| Group | Base route |
+*(All API endpoints below mount under `/api/v1` unless noted otherwise; open docs are served at `/docs` and `/openapi.json`.)*
+
+| Group | Mounted route |
 |---|---|
-| Authentication | /auth |
-| Current user / portals | /me |
-| Platform (Super Admin) | /platform |
-| Schools | /schools |
-| Subscriptions and plans | /subscriptions, /plans |
-| School settings and modules | /settings |
-| Users | /users |
-| Roles | /roles |
-| Permissions | /permissions |
-| Students | /students |
-| Guardians | /guardians |
-| Certificates | /certificates |
-| Staff | /staff |
-| Teachers | /teachers |
-| Academics | /academic |
-| Calendar | /calendar |
-| Attendance | /attendance |
-| Leave | /leave-requests |
-| Timetable | /timetable |
-| Examinations | /exams |
-| Online exams | /online-exams |
-| Homework | /homework |
-| Fees | /fees |
-| Invoices | /invoices |
-| Payments and receipts | /payments, /receipts |
-| Accounting | /accounting |
-| Library | /library |
-| Transport | /transport |
-| Hostel | /hostel |
-| Notifications | /notifications |
-| Messages | /messages |
-| Reports | /reports |
-| Dashboards | /dashboards |
-| Files and attachments | /files |
-| Audit logs | /audit-logs |
-| Imports and exports | /imports, /exports |
-| Background jobs | /jobs |
-| Integrations | /integrations |
-| Website administration | /website |
-| Public website (unauthenticated, read-only) | /public/{schoolSlug} |
-| Health | /health |
+| Authentication | `/api/v1/auth` (includes dev-only `/quick-signin` and `/demo-config`) |
+| Current user / portals | `/api/v1/me` |
+| Platform (Super Admin) | `/api/v1/platform` (`/plans`, `/schools`, `/schools/:id/status`, `/schools/:id/support-grant`, `/audit-logs`) |
+| School settings, modules, sequences, export & offline licence | `/api/v1/settings` (`/`, `/modules`, `/sequences/:docType`, `/export.json`, `/license/verify`) |
+| Audit logs | `/api/v1/audit-logs` |
+| Users, Roles & Permissions | `/api/v1` (`/users`, `/roles`, `/permissions`) |
+| Staff & Teachers | `/api/v1/staff` |
+| Students & Guardians | `/api/v1/students` |
+| Academics & Calendar | `/api/v1/academic` |
+| Attendance & Leave | `/api/v1/attendance` |
+| Timetable | `/api/v1/timetable` |
+| Examinations | `/api/v1/exams` |
+| Online exams | `/api/v1/online-exams` |
+| Homework | `/api/v1/homework` |
+| Promotions & Transfers | `/api/v1/promotions` |
+| Fees, Invoices, Payments & Refunds | `/api/v1/fees` |
+| Accounting | `/api/v1/accounting` |
+| Library | `/api/v1/library` |
+| Transport | `/api/v1/transport` |
+| Hostel | `/api/v1/hostel` |
+| Notifications | `/api/v1/notifications` |
+| Reports | `/api/v1/reports` |
+| Dashboards | `/api/v1/dashboards` |
+| Files and attachments | `/api/v1/files` |
+| Imports | `/api/v1/imports` |
+| Website administration | `/api/v1/website` |
+| Public SSR website & intake forms | `/public` and `/public/:schoolSlug` (plus `/public/assets` static assets) |
+| Health & readiness | `/healthz` and `/readyz` |
 
 ### API Standards
 
@@ -1513,7 +1491,7 @@ Initial engineering targets, subject to load testing against the capacity assump
 
 ## 12. Development Roadmap
 
-The product MUST be developed in controlled phases. Do not attempt to implement all modules simultaneously. Cross-cutting capabilities that later phases depend on (audit logging, file storage, background jobs, numbering, tenant-isolation tests) are built in **Phase 0** and extended afterwards.
+The product was planned and delivered in controlled phases (`Phases 0–7` implemented in codebase; cross-cutting capabilities built in **Phase 0** and extended through **Phase 7** + EduNexa public website/admissions portal). Remaining external launch gates (pilot school UAT, legal/privacy sign-off, external security audit) are tracked in §17.
 
 ### Phase 0 — Foundation and Engineering Setup
 
@@ -1736,7 +1714,6 @@ Possible future additions:
 - Advanced analytics.
 - AI-assisted reporting.
 - Automated parent communication workflows.
-- Online admission applications.
 - Digital certificates with QR verification (basic Transfer Certificate and bonafide certificates are in scope, see M02).
 - Library barcode scanning and reservations.
 - Additional interface languages.
@@ -1775,31 +1752,36 @@ Every module MUST have:
 
 | Area | Decision | Status |
 |---|---|---|
-| Frontend | React + Vite + TypeScript | Decided |
-| Backend | Node.js + Express + TypeScript | Decided |
-| UI | Bootstrap 5 | Decided |
-| HTTP client | Standardized Fetch wrapper | Decided |
-| Charts | Recharts | Decided (D1) |
-| Database | PostgreSQL | Decided |
-| ORM | Prisma | Decided |
-| API | REST / JSON | Decided |
-| API documentation | OpenAPI 3.1 | Decided |
-| Authentication | Secure server-managed sessions | Decided |
-| Authorization | RBAC + record-level permissions | Decided |
-| Architecture | Modular monolith | Decided |
-| SaaS tenancy | Shared multi-tenant database (dedicated DB deferred) | Decided |
-| Standalone | Independent deployment and database | Decided |
-| File storage | Local + S3-compatible object storage behind one adapter | Decided |
-| Containerization | Docker | Decided |
-| Background jobs | BullMQ + Redis 7 (SaaS and Standalone) | Decided (D2) |
-| PDF / Exports | `pdfkit` (PDF) + `exceljs` (Excel/CSV) | Decided (D3) |
-| Public website rendering | Backend server-side rendering (Phase 5) | Decided (D4) |
-| Testing | Unit + integration + E2E + security + accessibility + UAT | Decided |
+| Frontend | React 18 + Vite 6 + TypeScript | Implemented |
+| Backend | Node.js 22+ + Express 4 + TypeScript | Implemented |
+| UI | Bootstrap 5 + `bootstrap-icons` + grouped dark sidebar | Implemented |
+| HTTP client | Standardized Fetch wrapper (`X-CSRF-Token`) | Implemented |
+| Charts | Recharts (decided in D1; not yet installed in `apps/web`, dashboards currently use Bootstrap cards) | Deferred in bundle (D1) |
+| Database | PostgreSQL 16 | Implemented |
+| ORM | Prisma 6 | Implemented |
+| API | REST / JSON | Implemented |
+| API documentation | OpenAPI 3.1 (`/docs`, `/openapi.json`) | Implemented |
+| Authentication | Secure server-managed sessions (`Argon2id` + HTTP-only cookie + CSRF) | Implemented |
+| Authorization | RBAC + record-level permissions + `forTenant` + PostgreSQL RLS (`0004`–`0006`) | Implemented |
+| Architecture | Modular monolith | Implemented |
+| SaaS tenancy | Shared multi-tenant database (`APP_MODE=saas`) | Implemented |
+| Standalone | Independent deployment and database (`APP_MODE=standalone`) | Implemented |
+| File storage | Local + S3-compatible object storage behind `StorageAdapter` | Implemented |
+| Containerization | Docker (`docker/docker-compose*.yml`) or native PostgreSQL 16 + Redis 7 | Implemented |
+| Background jobs | BullMQ + Redis 7 | Implemented (D2) |
+| PDF / Exports | `pdfkit` (PDF) + `exceljs` (Excel/CSV) | Implemented (D3) |
+| Public website rendering | Backend server-side rendering + `/website` CMS + admissions/inquiries | Implemented (D4) |
+| Testing | Vitest + Supertest (46 API tests / 10 files, 1 Web test) | Implemented (unit/integration/RLS) |
 | Documentation | Markdown | Decided |
 
 ---
 
-## 17. Final Product Acceptance Criteria
+## 17. Final Product Acceptance Criteria & Verified Implementation Status
+
+**Verified Codebase Baseline (Current Release):**
+- **Implemented & Verified Phases (`0`–`7` + EduNexa Public Portal & Auth UI):** Core foundation, RBAC & grouped sidebar shell, academics/students/staff/attendance/timetable/exams/online exams/homework/promotions, fees (`pdfkit` + `exceljs`) & double-entry accounting, library/transport/hostel/BullMQ notifications, role dashboards & reports, SSR school website (`home`, `about`, `academics`, `classes`, `teachers`, `admissions`, `events`, `announcements`, `gallery`, `contact`), public Admission Applications (`admission_applications`) & Contact Inquiries (`contact_inquiries`), `/website` CMS, `/login` + `/forgot-password` + `/reset-password` + dev-only 9-role Quick Sign In, SaaS onboarding (`/api/v1/platform`), offline licence check (`/api/v1/settings/license/verify`), school JSON export (`/api/v1/settings/export.json`), and PostgreSQL `FORCE ROW LEVEL SECURITY` migrations (`0001`–`0006`).
+- **Automated Checks:** `pnpm test` (`@school-erp/contracts`, `@school-erp/api`: 10 test files / 46 tests including live cross-tenant and PostgreSQL RLS checks, `@school-erp/web`: 1 test).
+- **Pre-Production / External Sign-off Still Required Before Pilot Launch:** Live pilot school User Acceptance Testing (UAT), legal/privacy counsel sign-off (e.g., DPDP compliance), external penetration/accessibility audit, automated browser E2E suite, and optional bundling of deferred libraries (`Recharts`, `i18next`) if needed.
 
 The School ERP can be considered ready for its initial production release when:
 
@@ -1862,11 +1844,9 @@ The School ERP can be considered ready for its initial production release when:
 
 ## Conclusion
 
-This PRD establishes the functional and technical baseline for building a complete School Management System.
+This PRD documents both the functional/technical baseline and the implemented **EduNexa** codebase across multi-school SaaS (`APP_MODE=saas`) and standalone (`APP_MODE=standalone`) deployments.
 
-The system will use one modular codebase that supports both multi-school SaaS and standalone school deployments. Its foundation will prioritize data isolation, academic history, financial integrity, role-based permissions and maintainability.
-
-**Implementation should begin with Phase 0 and Phase 1, after the open decisions in §19 are closed.** Do not build every module at once, and do not treat a visually complete interface as evidence that a business workflow is complete.
+Phases 0–7 and the EduNexa public website/admissions portal are implemented and verified against unit, integration, and PostgreSQL RLS suites; pilot school UAT, legal/privacy sign-off, external security audit, and browser E2E automation remain pre-production gates before live school rollout.
 
 ---
 

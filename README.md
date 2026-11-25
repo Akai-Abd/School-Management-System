@@ -28,7 +28,7 @@
   <a href="#-tech-stack">Tech Stack</a> •
   <a href="#-quick-start">Quick Start</a> •
   <a href="#-roadmap">Roadmap</a> •
-  <a href="School_Management_System_PRD_v1.1.md">PRD v1.1</a>
+  <a href="School%20Management%20System%20v1.1.md">PRD v1.1</a>
 </p>
 
 </div>
@@ -37,7 +37,7 @@
 
 > [!NOTE]
 > **Project Status — Phases 0–7 + EduNexa Public Portal & CMS Implemented & Verified**
-> Full modular-monolith ERP covering Core Admin, Academics, Attendance, Timetable, Exams/Online Exams, Homework, Fees (`pdfkit` + `exceljs`), Double-Entry Accounting, Library, Transport, Hostel, BullMQ Notifications, SSR School Website (`Home`, `Classes`, `Our Teachers`, `News & Notices`, `Events`, `Admissions`, `Gallery`, `Contact Us` + admin CMS), Auth & Password Reset UI, SaaS Platform Onboarding, Offline Licensing, and PostgreSQL `FORCE ROW LEVEL SECURITY`. Full specification: [School_Management_System_PRD_v1.1.md](School_Management_System_PRD_v1.1.md).
+> Full modular-monolith ERP covering Core Admin, Academics, Attendance, Timetable, Exams/Online Exams, Homework, Fees (`pdfkit` + `exceljs`), Double-Entry Accounting, Library, Transport, Hostel, BullMQ Notifications, SSR School Website (`Home`, `Classes`, `Our Teachers`, `News & Notices`, `Events`, `Admissions`, `Gallery`, `Contact Us` + admin CMS), Auth & Password Reset UI, SaaS Platform Onboarding, Offline Licensing, and PostgreSQL `FORCE ROW LEVEL SECURITY`. Full specification: [School Management System v1.1.md](School%20Management%20System%20v1.1.md).
 
 ---
 
