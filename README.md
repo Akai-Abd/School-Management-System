@@ -1,8 +1,8 @@
 <div align="center">
 
-# School Management System (School ERP)
+# EduNexa — School Management System (School ERP)
 
-**Multi-Tenant Cloud SaaS & Self-Hosted Standalone School ERP**
+**Multi-Tenant Cloud SaaS & Self-Hosted Standalone School ERP + Public School Website**
 
 <p>
   <a href=".github/workflows/ci.yml">
@@ -36,8 +36,8 @@
 ---
 
 > [!NOTE]
-> **Project Status — Phases 0–7 Implemented & Verified**
-> Full modular-monolith ERP covering Core Admin, Academics, Attendance, Timetable, Exams/Online Exams, Homework, Fees (`pdfkit` + `exceljs`), Double-Entry Accounting, Library, Transport, Hostel, BullMQ Notifications, SSR School Website, SaaS Platform Onboarding, Offline Licensing, and PostgreSQL `FORCE ROW LEVEL SECURITY`. Full specification: [School_Management_System_PRD_v1.1.md](School_Management_System_PRD_v1.1.md).
+> **Project Status — Phases 0–7 + EduNexa Public Portal & CMS Implemented & Verified**
+> Full modular-monolith ERP covering Core Admin, Academics, Attendance, Timetable, Exams/Online Exams, Homework, Fees (`pdfkit` + `exceljs`), Double-Entry Accounting, Library, Transport, Hostel, BullMQ Notifications, SSR School Website (`Home`, `Classes`, `Our Teachers`, `News & Notices`, `Events`, `Admissions`, `Gallery`, `Contact Us` + admin CMS), Auth & Password Reset UI, SaaS Platform Onboarding, Offline Licensing, and PostgreSQL `FORCE ROW LEVEL SECURITY`. Full specification: [School_Management_System_PRD_v1.1.md](School_Management_System_PRD_v1.1.md).
 
 ---
 
@@ -72,7 +72,18 @@ flowchart LR
 - **Multi-School Safe Roles:** `user_roles` is bound to `(school_membership_id, school_id, role_id)`—preventing privilege bleed across schools.
 - **No Trust in Client Uploads:** Magic-byte inspection allows only `PNG`, `JPEG`, `WebP`, and `PDF`; private downloads enforce `Content-Disposition: attachment` or short-lived S3 signed URLs.
 - **Atomic School Sequences:** `document_sequences` generates race-free, school-scoped prefixes (`ADM-`, `EMP-`, `INV-`, `RCP-`, `JRN-`).
-- **Fail-Fast Config:** Startup Zod validation rejects unsafe production defaults (`SESSION_SECRET`, missing S3 credentials).
+- **Fail-Fast Config:** Startup Zod validation rejects unsafe production defaults (`SESSION_SECRET`, missing S3 credentials, or `ENABLE_DEMO_QUICK_SIGNIN=true` in production).
+- **Hardened Public SSR & Forms:** Self-hosted static assets (`/public/assets/*`) satisfy strict Helmet CSP, `sanitizeRichHtml` strips unsafe tags/handlers/URIs, and public Admissions/Contact POSTs enforce rate limiting, same-origin checks, and allowlisted error codes.
+- **PostgreSQL Row-Level Security (RLS):** Migrations `0004`–`0006` enforce `FORCE ROW LEVEL SECURITY` scoped by `app.current_school_id`.
+
+---
+
+## 🌐 EduNexa Public Website & Auth Experience
+
+- **Smart Root Routing (`/`):** Unauthenticated visitors opening `http://localhost:5173/` are routed to the active school's SSR landing page (`/public` → `/public/demo-school`); authenticated users open the grouped dark-sidebar EduNexa Dashboard.
+- **Public Pages:** `Home`, `About`, `Academics`, `Classes` (student counts, sections, subjects), `Our Teachers` (designation, specialization, qualifications, experience—zero contact PII), `Admissions` (online application form stored in `admission_applications`), `Events`, `News & Notices`, `Gallery`, and `Contact Us` (inquiries stored in `contact_inquiries`).
+- **Website Manager (`/website`):** Admin CMS to update Hero/Contact settings, publish pages/news/events, and review/update Admission Applications and Contact Inquiries.
+- **Authentication:** `/login` (password toggle, `Remember me` 30-day session, MFA TOTP prompt), `/forgot-password`, `/reset-password`, and dev-only 9-role **Quick Sign In** (`Superadmin`, `Admin`, `Teacher`, `Parent`, `Student`, `Accountant`, `Librarian`, `Driver`, `Hostel` — requires `NODE_ENV !== 'production'` and `ENABLE_DEMO_QUICK_SIGNIN=true`).
 
 ---
 
@@ -98,24 +109,33 @@ school-erp/
 ├── apps/
 │   ├── api/
 │   │   ├── prisma/
-│   │   │   ├── migrations/0001_phase0_partial_indexes/
+│   │   │   ├── migrations/
+│   │   │   │   ├── 0001_phase0_partial_indexes/
+│   │   │   │   ├── 0002_phase1_partial_indexes/
+│   │   │   │   ├── 0003_phase4_partial_indexes/
+│   │   │   │   ├── 0004_phase6_rls/
+│   │   │   │   ├── 0005_phase7_admission_applications/
+│   │   │   │   └── 0006_phase7_contact_inquiries/
 │   │   │   ├── schema.prisma
-│   │   │   └── seed.ts
+│   │   │   └── seed.ts         # Standalone bootstrap + dev demo accounts & showcase seed
+│   │   ├── public/assets/      # Self-hosted theme CSS, Bootstrap Icons & EduNexa SVGs
 │   │   └── src/
 │   │       ├── config/         # Fail-fast Zod environment loader
-│   │       ├── lib/            # Prisma forTenant, storage adapters, OpenAPI, errors, logger, audit
-│   │       ├── middleware/     # Auth, CSRF, tenant scope, RBAC permissions, request context
-│   │       └── modules/        # Modular monolith feature slices (auth, files, ...)
+│   │       ├── lib/            # Prisma forTenant + nextDocumentNumber, storage, OpenAPI, errors
+│   │       ├── middleware/     # Auth, CSRF, tenant scope, RBAC permissions, module guards
+│   │       └── modules/        # Modular monolith feature slices (auth, academic, website, ...)
 │   └── web/
+│       ├── public/assets/      # EduNexa SVG logo & favicon
 │       └── src/
 │           ├── api/            # Typed fetch client with CSRF injection
-│           ├── components/     # Responsive Bootstrap 5 shell & UI states
-│           ├── context/        # Auth + active school switcher
-│           └── features/       # Login & role-aware dashboard
+│           ├── components/     # Grouped EduNexa sidebar shell (AppLayout) & UI states
+│           ├── context/        # Auth, quick-signin, logout & active school switcher
+│           ├── features/       # Auth, Dashboard, Academic, Operations, Finance, Website CMS, Settings
+│           └── styles/         # Shared EduNexa stylesheet (theme.css)
 ├── packages/
-│   └── contracts/              # Shared Zod DTOs & permission constants
+│   └── contracts/              # Shared Zod DTOs & permission constants (TS Project References)
 ├── docker/
-│   └── docker-compose.yml      # PostgreSQL 16 + Redis 7
+│   └── docker-compose.yml      # Optional PostgreSQL 16 + Redis 7 containers
 └── .github/workflows/ci.yml
 ```
 
@@ -127,7 +147,7 @@ school-erp/
 
 ### 1. Prerequisites
 - **Node.js** `>= 22` and **pnpm** `9+`
-- **Docker** & **Docker Compose**
+- **PostgreSQL 16+** & **Redis 7+** (either installed natively via `apt`/OS package or via **Docker Compose**)
 
 ### 2. Run Locally
 
@@ -135,15 +155,19 @@ school-erp/
 # Install dependencies
 pnpm install
 
-# Configure environment variables
+# Configure environment variables (set ENABLE_DEMO_QUICK_SIGNIN=true for dev demo accounts/quick-signin)
 cp .env.example .env
 
-# Start PostgreSQL 16 & Redis 7
+# Option A: Native PostgreSQL + Redis (ensure role/db `school_erp` matches .env; grant `school_erp_app` to `school_erp` for RLS tests)
+# Option B: Docker Compose
 docker compose -f docker/docker-compose.yml up -d
 
-# Generate Prisma client, apply migrations, and bootstrap standalone admin/school
-pnpm db:generate
-pnpm db:migrate
+# Push Prisma schema, apply partial-index & RLS SQL migrations, and bootstrap seed data
+pnpm db:push
+for f in apps/api/prisma/migrations/000*/migration.sql; do
+  sudo -u postgres psql -d school_erp -v ON_ERROR_STOP=1 -f "$f"
+done
+sudo -u postgres psql -d school_erp -c "GRANT school_erp_app TO school_erp;" 2>/dev/null || true
 pnpm db:bootstrap
 
 # Start API (http://localhost:4000) and Web (http://localhost:5173)
@@ -156,7 +180,10 @@ pnpm dev
 |---|---|
 | `pnpm typecheck` | Typecheck `contracts`, `api`, and `web` |
 | `pnpm build` | Build shared contracts, API, and production Vite bundle |
-| `pnpm test` | Run Vitest security & client test suites |
+| `pnpm test` | Run Vitest suites (API: 46 tests / 10 files incl. live RLS; Web: 1 test; contracts ok) |
+| `http://localhost:5173/` | Public EduNexa school website when signed out; Dashboard when signed in |
+| `http://localhost:5173/public/demo-school` | Public school landing page & subpages (`/classes`, `/teachers`, `/admissions`, `/contact`, etc.) |
+| `http://localhost:5173/login` | Sign In, Forgot/Reset Password & dev-only 9-role Quick Sign In |
 | `http://localhost:4000/docs` | Interactive OpenAPI 3.1 Swagger UI |
 | `http://localhost:4000/healthz` | API liveness & active `APP_MODE` |
 
