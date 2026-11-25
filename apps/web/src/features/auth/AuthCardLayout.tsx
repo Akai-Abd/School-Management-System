@@ -28,7 +28,7 @@ export function AuthCardLayout({ title, subtitle, narrow = false, children }: Au
               Visit Public School Website
             </a>
           </div>
-          <div className="mt-1">&copy; {new Date().getFullYear()} EduCore. All rights reserved.</div>
+          <div className="mt-1">&copy; {new Date().getFullYear()} Abdurrahman. All rights reserved.</div>
         </div>
       </div>
     </div>
