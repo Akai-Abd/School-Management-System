@@ -172,5 +172,17 @@ describe('Phase 5 online exams, SSR website, and role dashboards', () => {
     } else {
       expect(res.status).toBe(404);
     }
+
+    const badDate = await request(app)
+      .post('/public/demo-school/admissions/apply')
+      .type('form')
+      .send({
+        studentName: 'Test Student',
+        dob: '2026-02-30',
+        guardianName: 'Guardian',
+        phone: '9800000000',
+        email: 'parent@example.com',
+      });
+    expect([303, 404]).toContain(badDate.status);
   });
 });

@@ -66,16 +66,24 @@ export const createWebsiteAnnouncementSchema = z.object({
   isPublished: z.boolean().default(true),
 });
 
+const calendarDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD date')
+  .refine((val) => {
+    const parsed = new Date(`${val}T00:00:00.000Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(val);
+  }, 'Invalid calendar date');
+
 export const createWebsiteEventSchema = z.object({
   title: z.string().trim().min(2).max(160),
-  eventDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD date'),
+  eventDate: calendarDateSchema,
   description: z.string().trim().max(1000).optional(),
   isPublished: z.boolean().default(true),
 });
 
 export const createAdmissionApplicationSchema = z.object({
   studentName: z.string().trim().min(2).max(150),
-  dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD date of birth'),
+  dob: calendarDateSchema,
   gender: z.enum(['', 'male', 'female', 'other']).optional(),
   classId: z.string().uuid().optional().or(z.literal('')),
   guardianName: z.string().trim().min(2).max(150),
