@@ -1,6 +1,6 @@
 <div align="center">
 
-# EduNexa — School Management System (School ERP)
+# EduNexa School Management System (School ERP)
 
 **Multi-Tenant Cloud SaaS & Self-Hosted Standalone School ERP + Public School Website**
 
